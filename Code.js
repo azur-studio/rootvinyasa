@@ -618,7 +618,7 @@ function doGet(e) {
     return _handleApiGet_(e);
   }
   // ── HTML 모드: 기존 방식 (GAS URL 직접 접속 시) ──
-  var template = e.parameter.page === 'admin' ? 'Admin' : 'Index';
+  var template = e.parameter.page === 'admin' ? 'Admin' : 'index';
   return HtmlService.createTemplateFromFile(template).evaluate()
     .setTitle('루트빈야사')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
