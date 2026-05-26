@@ -1,0 +1,11 @@
+# clasp 설정 (스크립트 ID 포함)
+.clasp.json
+
+# Claude 내부 파일
+.claude/
+
+# 백업 파일
+Index.original.html
+
+# macOS
+.DS_Store

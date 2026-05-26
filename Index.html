@@ -1,0 +1,3062 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="color-scheme" content="light">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="description" content="루트 빈야사 요가 클래스 신청 - 토요일 아침, 호흡과 움직임의 수련.">
+  <meta name="theme-color" content="#EDE6D6">
+  <meta property="og:title" content="Root Vinyasa">
+  <meta property="og:description" content="토요일 아침의 빈야사 수련. 클래스 신청 페이지.">
+  <meta property="og:type" content="website">
+  <title>Root Vinyasa</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@200;300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+
+  <style>
+    /* ══════════════════════════════════════════════════════════
+       DESIGN TOKENS — Pure achromatic scale (Apple-inspired)
+       무채색 + 투명도만으로 정보 위계를 통제
+       ══════════════════════════════════════════════════════════ */
+    :root {
+      /* surfaces */
+      --bg:         #FFFFFF;  /* 순백 — 공간을 무한히 확장 */
+      --surface:    #F5F5F7;  /* 폼 입력칸/카드 배경 */
+      --surface-2:  #E5E5EA;  /* 터치/호버 활성 */
+
+      /* ink */
+      --text:       #1D1D1F;  /* 딥 그레이 (절대 순흑 X) */
+      --text-light: #424245;  /* 부제목 */
+      --text-faint: #86868B;  /* placeholder / 비활성 안내 */
+      --text-dim:   #C7C7CC;  /* 비활성 텍스트 */
+
+      /* lines — 투명 블랙으로 배경에 자연스럽게 녹아듦 */
+      --line:       rgba(0, 0, 0, 0.08);
+      --line-soft:  rgba(0, 0, 0, 0.05);
+
+      /* accents */
+      --accent:     #1D1D1F;  /* CTA 검정 */
+      --accent-2:   #424245;
+      --accent-soft:#E5E5EA;
+
+      /* geometry */
+      --r-sm: 8px;
+      --r-md: 10px;
+      --r-lg: 12px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+
+    :focus { outline: none; }
+    :focus-visible {
+      outline: 1px solid var(--text);
+      outline-offset: 3px;
+      border-radius: 4px;
+    }
+    /* 입력칸/텍스트영역은 박스를 부드럽게 감싸는 투명 링으로 */
+    input:focus-visible,
+    textarea:focus-visible {
+      outline: none;
+      border-color: var(--text) !important;
+      box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.08);
+    }
+    button, a.btn-action, label.checkbox-wrap {
+      min-height: 44px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .cal-nav-btn { position: relative; min-width: 44px; min-height: 44px; }
+    ::selection { background: var(--accent-soft); color: var(--text); }
+    @supports (padding: max(0px)) {
+      body { padding-bottom: env(safe-area-inset-bottom); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+
+    body.scroll-lock {
+      position: fixed;
+      top: var(--scroll-y, 0);
+      left: 0; right: 0;
+      width: 100%;
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       TYPOGRAPHY RULES
+       ─ Pretendard(고딕): 본문·폼·라벨·버튼 — 유틸리티의 명확성
+       ─ Noto Serif KR(명조): 랜딩 메인 타이틀에만 — 감성의 영역
+       ══════════════════════════════════════════════════════════ */
+    body {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      letter-spacing: -0.005em;
+      font-weight: 400;
+    }
+
+    /* 고딕 역할 — 숫자/데이터/액션 버튼 */
+    .num, .data-text,
+    input[type="tel"], input[type="text"].data-text,
+    .opt-price, .discount-badge, .pass-section-label,
+    #personCount, #oneDayTotal,
+    .cal-nav-btn, .cal-day-name, .cal-date, #calMonthText,
+    .member-card-phone, .collision-input,
+    .bk-sum-label, .bk-sum-val,
+    .final-row, .final-label, .final-value,
+    .bank-number, #finalAmountDisplay, .amount-value,
+    .floating-cta, .btn-bottom, .btn-sub-action, .btn-option,
+    .pass-trigger, .date-trigger, .pass-more-toggle,
+    .sms-contact, .section-eyebrow, .price-amt, .price-save,
+    .result-dates-box .num, #phoneError,
+    #returnBanner .rb-action {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-feature-settings: "tnum" 1;
+      letter-spacing: 0.02em;
+    }
+
+    /* 종이 질감 레이어 제거됨 — 순백 캔버스 유지 */
+
+    .fi { opacity: 0; transform: translateY(8px); transition: opacity 1s ease, transform 1s ease; }
+    .fi.on { opacity: 1; transform: translateY(0); }
+
+    /* ══════════════════════════════════════════════════════════
+       TOP UTILITY BAR — 로고 좌, 문의 우
+       ══════════════════════════════════════════════════════════ */
+    .top-bar {
+      position: fixed;
+      top: calc(22px + env(safe-area-inset-top));
+      left: 0; right: 0;
+      z-index: 180;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 28px;
+      pointer-events: none;
+    }
+    .top-bar > * { pointer-events: auto; }
+    .top-logo {
+      font-family: 'Noto Serif KR', Georgia, serif;
+      font-size: 10px;
+      font-weight: 400;
+      letter-spacing: 0.44em;
+      text-indent: 0.44em;
+      color: var(--text);
+      text-transform: uppercase;
+    }
+    .sms-contact {
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--text);
+      text-decoration: none;
+      letter-spacing: 0.22em;
+      text-indent: 0.22em;
+      text-transform: uppercase;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--text);
+      transition: opacity 0.25s ease, border-color 0.25s ease;
+    }
+    .sms-contact:hover { opacity: 0.6; }
+    body.form-active .top-bar,
+    body.complete-active .top-bar { opacity: 0; pointer-events: none; transition: opacity 0.4s ease; }
+
+    /* ══════════════════════════════════════════════════════════
+       LANDING STAGE
+       ══════════════════════════════════════════════════════════ */
+    #landing-stage {
+      transition: opacity 0.55s cubic-bezier(0.16, 1, 0.3, 1), transform 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    body.form-active #landing-stage {
+      opacity: 0;
+      transform: translateY(-12px);
+      pointer-events: none;
+    }
+
+    /* ── HERO ── */
+    #sec-hero {
+      position: relative;
+      height: 100vh;
+      height: 100svh;
+      min-height: 620px;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      overflow: hidden;
+      background: var(--bg);
+    }
+
+    .hero-circle {
+      position: absolute;
+      left: 50%; top: 50%;
+      transform: translate(-50%, -50%);
+      width: min(400px, 82vw); height: min(400px, 82vw);
+      opacity: 0.5;
+      pointer-events: none;
+    }
+
+    .hero-text {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      display: flex; flex-direction: column;
+      align-items: center;
+      gap: 18px;
+    }
+
+    /* 메인 타이틀만 명조 — 감성의 영역 */
+    .hero-brand {
+      font-family: 'Noto Serif KR', Georgia, serif;
+      font-size: 34px; font-weight: 400;
+      color: var(--text);
+      letter-spacing: 0.04em;
+      line-height: 1.25;
+    }
+    .hero-sub {
+      font-family: 'Pretendard', -apple-system, sans-serif;
+      font-size: 13px;
+      font-weight: 400;
+      color: var(--text-faint);
+      letter-spacing: 0.1em;
+      text-indent: 0.1em;
+    }
+
+    /* 히어로 안 토글 — 기본 / 재방문자 인사 */
+    .hero-default { display: flex; flex-direction: column; align-items: center; gap: 18px; transition: opacity 0.4s ease; }
+    .hero-return  {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      animation: heroReturnIn 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    body.is-return .hero-default { display: none; }
+    body.is-return .hero-return  { display: flex; }
+    @keyframes heroReturnIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: none; }
+    }
+    .hero-return-greet {
+      font-family: 'Pretendard', -apple-system, sans-serif;
+      font-size: 22px;
+      font-weight: 500;
+      color: var(--text);
+      letter-spacing: -0.01em;
+      line-height: 1.4;
+    }
+    .hero-return-greet strong { font-weight: 600; }
+    .hero-return-sub {
+      font-family: 'Pretendard', -apple-system, sans-serif;
+      font-size: 15px;
+      font-weight: 400;
+      color: var(--text-light);
+      letter-spacing: 0;
+      line-height: 1.55;
+    }
+    .hero-return-dismiss {
+      margin-top: 8px;
+      background: none;
+      border: none;
+      padding: 6px 10px;
+      font-family: 'Pretendard', sans-serif;
+      font-size: 11px;
+      font-weight: 400;
+      color: var(--text-faint);
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 4px;
+      min-height: 32px;
+    }
+    .hero-return-dismiss:hover { color: var(--text); }
+
+    .hero-foot {
+      position: absolute;
+      bottom: 44px; left: 50%;
+      transform: translateX(-50%);
+      z-index: 2;
+      font-size: 9px;
+      font-weight: 500;
+      letter-spacing: 0.34em;
+      text-indent: 0.34em;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      font-family: 'Pretendard', sans-serif;
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       ABOUT & PASSES
+       ══════════════════════════════════════════════════════════ */
+    .section-eyebrow {
+      font-size: 9px;
+      font-weight: 500;
+      letter-spacing: 0.44em;
+      text-indent: 0.44em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-bottom: 48px;
+    }
+
+    #sec-about { background: var(--bg); padding: 130px 32px 110px; border-top: 1px solid var(--line-soft); }
+    .about-grid { max-width: 480px; margin: 0 auto; }
+    .about-body { font-size: 16px; font-weight: 300; line-height: 2.1; color: var(--text); margin-bottom: 72px; letter-spacing: -0.002em; }
+    .about-meta { border-top: 1px solid var(--line); }
+    .meta-row { display: flex; justify-content: space-between; align-items: baseline; padding: 18px 0; border-bottom: 1px solid var(--line); gap: 16px; }
+    .meta-key { font-size: 9px; font-weight: 500; letter-spacing: 0.22em; text-transform: uppercase; color: var(--text-faint); font-family: 'Pretendard', sans-serif; }
+    .meta-val { font-size: 14px; font-weight: 300; color: var(--text); text-align: right; }
+    .meta-val a { color: var(--text); font-size: 11px; margin-left: 10px; text-decoration: underline; text-underline-offset: 3px; font-family: 'Pretendard', sans-serif; letter-spacing: 0.04em; }
+    .meta-val small { display: block; font-size: 11px; color: var(--text-faint); margin-top: 3px; font-weight: 300; font-family: 'Pretendard', sans-serif; letter-spacing: 0.02em; }
+
+    #sec-info { background: var(--bg); padding: 110px 32px 200px; border-top: 1px solid var(--line-soft); }
+    .info-inner { max-width: 480px; margin: 0 auto; }
+    .price-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 22px 0; border-bottom: 1px solid var(--line); gap: 16px; }
+    .price-name { font-size: 15px; font-weight: 300; color: var(--text); }
+    .price-name small { display: block; font-size: 12px; color: var(--text-faint); margin-top: 4px; font-weight: 300; font-family: 'Pretendard', sans-serif; letter-spacing: 0.02em; }
+    .price-amt { font-size: 15px; font-weight: 500; color: var(--text); text-align: right; white-space: nowrap; }
+    .price-save { display: block; font-size: 10px; color: var(--text-faint); font-weight: 500; margin-top: 4px; letter-spacing: 0.04em; }
+
+    .info-quiet {
+      margin-top: 36px;
+      font-size: 12px;
+      color: var(--text-faint);
+      font-family: 'Pretendard', sans-serif;
+      letter-spacing: 0.02em;
+      line-height: 1.7;
+      font-weight: 400;
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       FLOATING CTA — 오묘한 아우라
+       ══════════════════════════════════════════════════════════ */
+    .cta-wrap {
+      position: fixed;
+      bottom: calc(36px + env(safe-area-inset-bottom));
+      left: 0; right: 0;
+      display: flex;
+      justify-content: center;
+      z-index: 150;
+      pointer-events: none;
+      /* 초기: 데이터 로드 전엔 숨김 — 자연스러운 스크롤 노출 */
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 0.55s cubic-bezier(0.16, 1, 0.3, 1), transform 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .cta-wrap > * { pointer-events: auto; }
+    body.data-loaded .cta-wrap {
+      opacity: 1;
+      transform: none;
+    }
+    body.form-active .cta-wrap,
+    body.complete-active .cta-wrap {
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(20px);
+    }
+
+    .floating-cta {
+      position: relative;
+      isolation: isolate;
+      background: var(--text);
+      color: var(--surface);
+      border: none;
+      padding: 20px 54px;
+      border-radius: var(--r-sm);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.36em;
+      text-indent: 0.36em;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: background 0.35s ease, letter-spacing 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+      min-width: 240px;
+    }
+    .floating-cta::before {
+      content: '';
+      position: absolute;
+      left: 50%; top: 50%;
+      width: 220%; height: 320%;
+      transform: translate(-50%, -50%) scale(0.9);
+      background:
+        radial-gradient(ellipse 42% 45% at 50% 50%, rgba(74,66,54,0.38) 0%, rgba(122,106,82,0.18) 38%, transparent 72%);
+      opacity: 0;
+      z-index: -1;
+      transition:
+        opacity   1.1s cubic-bezier(0.16, 1, 0.3, 1),
+        transform 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+      pointer-events: none;
+      filter: blur(18px);
+    }
+    .floating-cta:hover::before,
+    .floating-cta:focus-visible::before {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1.08);
+    }
+    .floating-cta:active::before {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1.22);
+      transition: opacity 0.15s ease, transform 0.85s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .floating-cta:hover { letter-spacing: 0.40em; text-indent: 0.40em; }
+    .floating-cta:active { background: #1F1B16; }
+
+    /* 재방문자 인사 (랜딩 히어로) */
+    .return-hero {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 16px;
+      max-width: 320px;
+      text-align: center;
+    }
+    .return-hero.visible { display: flex; }
+    .rh-greet {
+      font-family: 'Pretendard', -apple-system, sans-serif;
+      font-size: 14px;
+      font-weight: 300;
+      color: var(--text-light);
+      letter-spacing: -0.005em;
+    }
+    .rh-greet strong { font-weight: 500; color: var(--text); }
+    .rh-dismiss {
+      background: none;
+      border: none;
+      padding: 4px 8px;
+      font-family: 'Pretendard', sans-serif;
+      font-size: 11px;
+      font-weight: 400;
+      color: var(--text-faint);
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      min-height: 28px;
+    }
+    .rh-dismiss:hover { color: var(--text); }
+
+    /* ══════════════════════════════════════════════════════════
+       RETURN BANNER (폼 상단 섬세한 라인)
+       ══════════════════════════════════════════════════════════ */
+    #returnBanner {
+      display: none;
+      padding: 14px 0 16px;
+      margin-bottom: 28px;
+      border-bottom: 1px solid var(--line);
+      font-size: 13px;
+      font-weight: 300;
+      color: var(--text-light);
+      line-height: 1.6;
+      transition: opacity 0.4s ease;
+    }
+    #returnBanner.visible { display: block; }
+    #returnBanner.hiding { opacity: 0; }
+    #returnBanner strong { font-weight: 500; color: var(--text); }
+    #returnBanner .rb-action {
+      color: var(--text);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      cursor: pointer;
+      margin-left: 6px;
+      font-size: 12px;
+      letter-spacing: 0.03em;
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       BOOKING FORM — 평면 Cascading
+       ══════════════════════════════════════════════════════════ */
+    #sec-booking {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      background: var(--bg);
+      padding: 40px 32px calc(120px + env(safe-area-inset-bottom));
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    body.form-active #sec-booking { opacity: 1; pointer-events: auto; }
+
+    .book-inner {
+      max-width: 480px;
+      margin: 0 auto;
+      padding-top: 36px;
+      /* 활성 문항 최상단 고정 — order 로 순서 제어 */
+      display: flex;
+      flex-direction: column;
+    }
+
+    .book-sec-label {
+      font-family: 'Pretendard', sans-serif;
+      font-size: 9px;
+      letter-spacing: 0.44em;
+      text-indent: 0.44em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-bottom: 44px;
+      font-weight: 500;
+      order: -2;            /* 항상 최상단 */
+    }
+    #may2BookingBar { order: -1; }   /* 라벨 바로 아래, 활성 문항 위 */
+
+    /* ── Cascading Step ── */
+    /* CSS Grid 0fr↔1fr 트릭으로 콘텐츠 높이를 브라우저가 자체 보간.
+       JS 측정 / max-height 해킹 없이 자연스럽게 열고 닫힘. */
+    .bk-step {
+      display: grid;
+      grid-template-rows: 0fr;
+      opacity: 0;
+      pointer-events: none;
+      margin-bottom: 0;
+      flex: 0 0 auto;
+      transition:
+        grid-template-rows 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+        opacity 0.4s ease-out,
+        margin-bottom 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .bk-step.revealed,
+    .bk-step.active {
+      grid-template-rows: 1fr;
+      opacity: 1;
+      pointer-events: auto;
+      margin-bottom: 36px;
+    }
+    .bk-step.locked { grid-template-rows: 0fr; opacity: 0; pointer-events: none; margin-bottom: 0; }
+    .bk-step.completed { margin-bottom: 6px; }
+    /* Grid 자식 wrapper — overflow:hidden + min-height:0 이 트릭의 핵심 */
+    .bk-step-inner { min-height: 0; overflow: hidden; }
+
+    .bk-active-body { display: block; padding-bottom: 4px; }
+    .bk-summary { display: none; }
+
+    .bk-step.completed .bk-active-body { display: none; }
+    .bk-step.completed .bk-summary {
+      display: flex;
+      align-items: baseline;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--line-soft);
+      gap: 16px;
+      cursor: pointer;
+      transition: opacity 0.25s ease;
+    }
+    .bk-step.completed .bk-summary:active { opacity: 0.55; }
+
+    .bk-sum-label {
+      font-size: 9px;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      flex-shrink: 0;
+      width: 64px;
+      font-weight: 500;
+    }
+    .bk-sum-val {
+      font-size: 14px;
+      font-weight: 400;
+      color: var(--text);
+      flex: 1;
+    }
+
+    /* 스텝 타이틀 */
+    .book-h {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 22px;
+      line-height: 1.4;
+      padding-top: 4px;
+      display: block;
+      letter-spacing: -0.02em;
+    }
+    .book-h strong { font-weight: 700; }
+
+    /* ── 이름 입력 (Apple 스타일 — 모서리가 둥근 연회색 박스) ── */
+    .name-row {
+      display: block;
+      border: none;
+    }
+    .name-row input {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid transparent;
+      border-radius: var(--r-lg);
+      padding: 15px 18px;
+      font-family: 'Pretendard', -apple-system, sans-serif;
+      font-size: 16px;
+      font-weight: 400;
+      color: var(--text);
+      caret-color: var(--text);
+      letter-spacing: 0;
+      outline: none;
+      transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .name-row input::placeholder { color: var(--text-faint); font-weight: 400; }
+
+    #searchResultBox { margin-top: 18px; }
+    /* 결과 카드 — 살짝(4px) 떠오르며 등장 */
+    #searchResultBox > * {
+      animation: subtleRise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    @keyframes subtleRise {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    /* 레거시 이름 — 일부 코드가 참조할 수 있어 유지 */
+    @keyframes bk-result-rise {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .member-card {
+      display: block;
+      width: 100%;
+      text-align: left;
+      background: var(--surface);
+      border: 1px solid transparent;
+      border-radius: var(--r-lg);
+      padding: 16px 18px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: background 0.2s ease, transform 0.15s ease;
+      font-family: 'Pretendard', sans-serif;
+    }
+    .member-card:hover { background: var(--surface-2); }
+    .member-card:active { transform: scale(0.98); background: var(--surface-2); }
+    .member-card-phone { font-size: 15px; font-weight: 500; color: var(--text); letter-spacing: 0.02em; }
+
+    .btn-new-user {
+      width: 100%;
+      padding: 14px;
+      background: transparent;
+      color: var(--text);
+      border: none;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: center;
+      margin-top: 6px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      font-family: 'Pretendard', sans-serif;
+    }
+
+    .collision-note {
+      font-size: 13px;
+      color: var(--text-light);
+      margin-bottom: 12px;
+      line-height: 1.7;
+      font-weight: 300;
+    }
+    .collision-input {
+      width: 100%;
+      padding: 15px 18px;
+      background: var(--surface);
+      border: 1px solid transparent;
+      border-radius: var(--r-lg);
+      font-family: 'Pretendard', -apple-system, sans-serif;
+      font-size: 16px;
+      color: var(--text);
+      outline: none;
+      caret-color: var(--text);
+      transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    /* ── 연락처 (Apple 박스 스타일) ── */
+    .book-phone-input {
+      width: 100%;
+      padding: 15px 18px;
+      background: var(--surface);
+      border: 1px solid transparent;
+      border-radius: var(--r-lg);
+      outline: none;
+      font-family: 'Pretendard', -apple-system, sans-serif;
+      font-size: 16px;
+      font-weight: 400;
+      color: var(--text);
+      caret-color: var(--text);
+      letter-spacing: 0.02em;
+      display: block;
+      transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .book-phone-input::placeholder { color: var(--text-faint); }
+    #phoneError {
+      font-size: 11px;
+      color: var(--text-faint);
+      margin-top: 10px;
+      display: none;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+    }
+
+    /* ── 패스 / 시작일 트리거 (공통) ── */
+    .pass-trigger, .date-trigger {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--r-sm);
+      padding: 19px 22px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+      color: var(--text);
+      font-weight: 400;
+      transition: border-color 0.25s;
+      letter-spacing: 0.02em;
+    }
+    .pass-trigger:hover, .date-trigger:hover { border-color: var(--text); }
+    .pass-trigger .arrow, .date-trigger .arrow {
+      color: var(--text-faint);
+      font-size: 11px;
+      letter-spacing: 0;
+    }
+    .pass-trigger.is-placeholder, .date-trigger.is-placeholder { color: var(--text-faint); font-weight: 300; }
+
+    /* ── 패스 옵션 카드 ── */
+    .pass-section-label {
+      font-size: 9px;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-bottom: 14px;
+      font-weight: 500;
+    }
+    .btn-option {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--r-sm);
+      padding: 20px 22px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: border-color 0.2s ease, background 0.2s ease;
+    }
+    .btn-option:hover { border-color: var(--text); }
+    .btn-option:active { background: var(--surface-2); }
+    .opt-title { font-size: 14px; font-weight: 400; color: var(--text); text-align: left; letter-spacing: 0.01em; }
+    .opt-price { font-size: 14px; font-weight: 500; color: var(--text); text-align: right; white-space: nowrap; }
+    .discount-badge { display: block; font-size: 10px; color: var(--text-faint); font-weight: 500; margin-top: 3px; letter-spacing: 0.04em; }
+
+    .pass-more-toggle {
+      width: 100%;
+      padding: 18px 4px 4px;
+      background: transparent;
+      color: var(--text-faint);
+      border: none;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: left;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+    .pass-more-section { display: none; margin-top: 10px; }
+    .pass-more-section.open { display: block; }
+
+    /* ── 원데이 카운터 (바텀시트 내) ── */
+    .bk-sub-label {
+      font-family: 'Pretendard', -apple-system, sans-serif;
+      font-size: 13px;
+      font-weight: 300;
+      color: var(--text-faint);
+      margin: -8px 0 18px;
+      letter-spacing: -0.005em;
+    }
+    .oneday-total-row {
+      text-align: center;
+      font-family: 'Pretendard', sans-serif;
+      font-size: 14px;
+      font-weight: 400;
+      color: var(--text-light);
+      letter-spacing: 0.02em;
+      margin-bottom: 22px;
+    }
+    .oneday-total-row strong { font-weight: 500; color: var(--text); font-variant-numeric: tabular-nums; }
+    .leg-dot { display: inline-block; vertical-align: middle; margin-right: 2px; }
+    .leg-today { width:10px; height:10px; border:1px solid var(--text-faint); border-radius:50%; }
+    .leg-exp   { width:4px;  height:4px;  background:var(--text-faint); border-radius:50%; }
+
+    .counter-box {
+      display: flex;
+      align-items: center;
+      gap: 36px;
+      justify-content: center;
+      margin: 28px 0 18px;
+    }
+    .btn-circle {
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      border: 1px solid var(--line);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 20px;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .btn-circle:hover { border-color: var(--text); }
+    .btn-circle:active { background: var(--surface-2); }
+    #personCount {
+      font-size: 34px;
+      font-weight: 300;
+      color: var(--text);
+      min-width: 40px;
+      text-align: center;
+    }
+
+    /* ── 캘린더 (바텀시트 내) ── */
+    .cal-legend {
+      display: flex;
+      gap: 18px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+    .cal-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 11px;
+      font-weight: 400;
+      color: var(--text-faint);
+      letter-spacing: 0.02em;
+    }
+    .calendar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+    #calMonthText {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+      letter-spacing: 0.06em;
+    }
+    .cal-nav-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-faint);
+      font-size: 14px;
+      cursor: pointer;
+      padding: 4px 12px;
+    }
+    .cal-nav-btn:hover { color: var(--text); }
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7,1fr);
+      gap: 3px;
+      margin-bottom: 18px;
+    }
+    .cal-day-name {
+      text-align: center;
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--text-dim);
+      padding: 6px 0;
+      letter-spacing: 0.04em;
+    }
+
+    .cal-date {
+      width: 40px; height: 40px;
+      aspect-ratio: 1;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px;
+      font-weight: 400;
+      color: var(--text-dim);
+      border-radius: 50%;
+      cursor: default;
+      transition: all 0.15s;
+      min-width: 40px; min-height: 40px;
+      margin: auto;
+      opacity: 0.32;
+    }
+    .cal-date.valid-sat {
+      color: var(--text);
+      cursor: pointer;
+      opacity: 1;
+    }
+    .cal-date.valid-sat:hover { background: var(--surface-2); }
+    .cal-date.today {
+      border: 1px solid var(--text-faint);
+      color: var(--text);
+      opacity: 1;
+    }
+    .cal-date.session-date {
+      background: var(--text);
+      color: var(--surface);
+      font-weight: 500;
+      opacity: 1;
+      transform: scale(1.04);
+      transition: transform 0.35s cubic-bezier(0.16,1,0.3,1);
+    }
+    .cal-date.disabled { opacity: 0.22; cursor: default; }
+    .cal-date.occupied { text-decoration: line-through; opacity: 0.28; }
+    .cal-date.skipped-holiday { color: var(--text-dim); font-style: italic; opacity: 0.3; }
+    .cal-date.exp-date { position: relative; }
+    .cal-date.exp-date::after {
+      content: '';
+      position: absolute;
+      bottom: 4px;
+      width: 3px; height: 3px;
+      background: var(--text-faint);
+      border-radius: 50%;
+    }
+
+    #preHolidayNotice {
+      font-size: 12px;
+      color: var(--text-light);
+      line-height: 1.7;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      padding: 12px 14px;
+      border-radius: var(--r-sm);
+      margin-bottom: 14px;
+      display: none;
+      font-weight: 400;
+      font-family: 'Pretendard', sans-serif;
+      letter-spacing: 0.02em;
+    }
+    #preHolidayNotice strong { font-weight: 500; color: var(--text); }
+
+    .smart-notice-box {
+      text-align: center;
+      padding: 40px 0;
+      display: none;
+    }
+    .smart-notice-text {
+      font-size: 13px;
+      color: var(--text-faint);
+      line-height: 1.8;
+      margin-bottom: 20px;
+      font-weight: 300;
+    }
+    .btn-contact-help {
+      display: inline-block;
+      padding: 13px 22px;
+      border: 1px solid var(--line);
+      border-radius: var(--r-sm);
+      font-size: 11px;
+      color: var(--text);
+      text-decoration: none;
+      background: var(--surface);
+      font-weight: 500;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      font-family: 'Pretendard', sans-serif;
+    }
+
+    /* ── 날짜 선택 후 폼 요약 ── */
+    .result-dates-box {
+      background: var(--surface);
+      border: 1px solid var(--line-soft);
+      border-radius: var(--r-sm);
+      padding: 18px 20px;
+      margin-top: 14px;
+      display: none;
+    }
+    .result-dates-box .res-main-label {
+      font-size: 9px;
+      font-weight: 500;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-bottom: 8px;
+      font-family: 'Pretendard', sans-serif;
+    }
+    .result-dates-box .res-main-val {
+      font-size: 15px;
+      font-weight: 400;
+      color: var(--text);
+      font-family: 'Pretendard', sans-serif;
+      letter-spacing: 0.02em;
+    }
+    .result-detail-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 14px;
+      background: transparent;
+      border: none;
+      padding: 0;
+      font-size: 10px;
+      color: var(--text-faint);
+      cursor: pointer;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      font-weight: 500;
+      font-family: 'Pretendard', sans-serif;
+    }
+    .result-detail-toggle .arrow { transition: transform 0.3s ease; }
+    .result-detail-toggle.open .arrow { transform: rotate(180deg); }
+    .result-detail {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.5s cubic-bezier(0.16, 1, 0.3, 1), margin-top 0.4s ease;
+      margin-top: 0;
+    }
+    .result-detail.open {
+      max-height: 600px;
+      margin-top: 14px;
+    }
+    .result-detail .res-sub {
+      padding: 10px 0;
+      border-top: 1px solid var(--line-soft);
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--text-light);
+      font-weight: 300;
+    }
+    .result-detail .res-sub .res-sub-label {
+      font-size: 9px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      font-family: 'Pretendard', sans-serif;
+      font-weight: 500;
+      display: block;
+      margin-bottom: 4px;
+    }
+    .result-detail .res-sub .res-sub-val {
+      font-family: 'Pretendard', sans-serif;
+      font-size: 13px;
+      color: var(--text);
+      letter-spacing: 0.02em;
+    }
+
+    /* ── 메모 ── */
+    #memoGuideText {
+      font-size: 13px;
+      color: var(--text-faint);
+      margin-bottom: 16px;
+      line-height: 1.8;
+      font-weight: 300;
+    }
+    textarea#userMemo {
+      width: 100%;
+      min-height: 120px;
+      padding: 16px 18px;
+      background: var(--surface);
+      border: 1px solid transparent;
+      border-radius: var(--r-lg);
+      color: var(--text);
+      font-family: 'Pretendard', -apple-system, sans-serif;
+      font-size: 16px;
+      font-weight: 400;
+      line-height: 1.6;
+      outline: none;
+      resize: none;
+      caret-color: var(--text);
+      margin-bottom: 6px;
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+      letter-spacing: 0;
+      transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    textarea#userMemo::-webkit-scrollbar { display: none; }
+    textarea#userMemo::placeholder { color: var(--text-faint); }
+
+    /* ── 최종 요약 & 결제금 ── */
+    .final-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--line-soft);
+      gap: 12px;
+    }
+    .final-label {
+      font-size: 10px;
+      color: var(--text-faint);
+      width: 64px;
+      flex-shrink: 0;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      font-weight: 500;
+      padding-top: 3px;
+    }
+    .final-value {
+      font-size: 14px;
+      font-weight: 400;
+      color: var(--text);
+      text-align: right;
+      flex: 1;
+      letter-spacing: 0.01em;
+    }
+    .final-sub {
+      display: block;
+      font-size: 11px;
+      font-weight: 400;
+      color: var(--text-faint);
+      letter-spacing: 0.02em;
+      margin-top: 6px;
+      line-height: 1.7;
+    }
+
+    .amount-display {
+      margin-top: 32px;
+      padding: 24px 0;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+    .amount-label {
+      font-size: 10px;
+      color: var(--text-faint);
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      font-weight: 500;
+    }
+    .amount-value {
+      font-size: 28px;
+      font-weight: 500;
+      color: var(--text);
+      letter-spacing: 0.01em;
+    }
+    .amount-value .won {
+      font-size: 14px;
+      font-weight: 400;
+      color: var(--text-faint);
+      margin-left: 4px;
+    }
+
+    .policy-box { margin-top: 26px; }
+    .checkbox-wrap {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      font-size: 13px;
+      color: var(--text);
+      cursor: pointer;
+      line-height: 1.5;
+      transition: color 0.3s;
+      font-weight: 300;
+      font-family: 'Pretendard', -apple-system, sans-serif;
+    }
+    .checkbox-wrap input[type="checkbox"] {
+      margin-top: 3px;
+      accent-color: var(--text);
+      flex-shrink: 0;
+      width: 15px; height: 15px;
+    }
+    .policy-detail-toggle {
+      color: var(--text-faint);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      cursor: pointer;
+      margin-left: 6px;
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      font-family: 'Pretendard', sans-serif;
+    }
+
+    @keyframes gentlyShake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+    .checkbox-wrap.highlight { animation: gentlyShake 0.4s ease; color: var(--text); font-weight: 400; }
+
+    /* ── 정책 상세 (구조화된 내용) ── */
+    #hiddenPolicy {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.55s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease, margin-top 0.4s ease;
+      opacity: 0;
+      margin-top: 0;
+      background: var(--surface);
+      border: 1px solid var(--line-soft);
+      border-radius: var(--r-sm);
+    }
+    #hiddenPolicy.open {
+      max-height: 600px;
+      opacity: 1;
+      margin-top: 16px;
+    }
+    .policy-block {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--line-soft);
+    }
+    .policy-block:last-child { border-bottom: none; }
+    .policy-block-title {
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-bottom: 10px;
+      font-family: 'Pretendard', sans-serif;
+      font-weight: 500;
+    }
+    .policy-block-body {
+      font-size: 13px;
+      color: var(--text-light);
+      line-height: 1.85;
+      font-weight: 300;
+    }
+
+    /* ── 메인 CTA ── */
+    /* CTA — 완벽한 블랙. 눌릴 때 미세하게 줄어들며 물리적 압력감 */
+    .btn-bottom {
+      position: relative;
+      width: 100%;
+      padding: 18px;
+      display: block;
+      box-sizing: border-box;
+      min-height: 56px;
+      background: var(--accent);
+      color: #FFFFFF;
+      border: none;
+      font-family: 'Pretendard', -apple-system, sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      letter-spacing: 0.02em;
+      text-transform: none;
+      border-radius: var(--r-lg);
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background 0.2s ease, opacity 0.2s ease;
+      margin-top: 30px;
+    }
+    .btn-bottom:active:not(:disabled) {
+      transform: scale(0.97);
+      background: #000000;
+    }
+    .btn-bottom:disabled { opacity: 0.35; cursor: default; }
+
+    /* ══════════════════════════════════════════════════════════
+       COMPLETE
+       ══════════════════════════════════════════════════════════ */
+    #sec-complete {
+      position: fixed;
+      inset: 0;
+      z-index: 160;
+      overflow-y: auto;
+      background: var(--bg);
+      padding: 80px 28px calc(80px + env(safe-area-inset-bottom));
+      display: none;
+    }
+    #sec-complete.visible { display: block; animation: stepFadeIn 0.55s ease forwards; }
+    @keyframes stepFadeIn { from{opacity:0; transform: translateY(8px)} to{opacity:1; transform: translateY(0)} }
+
+    .complete-inner {
+      max-width: 440px;
+      margin: 0 auto;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--r-md);
+      padding: 48px 36px 36px;
+    }
+    .complete-label {
+      font-size: 9px;
+      letter-spacing: 0.44em;
+      text-indent: 0.44em;
+      color: var(--text-faint);
+      text-transform: uppercase;
+      margin-bottom: 22px;
+      font-weight: 500;
+      text-align: center;
+      font-family: 'Pretendard', sans-serif;
+    }
+    .complete-name {
+      font-size: 24px;
+      font-weight: 300;
+      color: var(--text);
+      margin-bottom: 26px;
+      line-height: 1.55;
+      text-align: center;
+      font-family: 'Pretendard', -apple-system, sans-serif;
+      letter-spacing: 0.02em;
+    }
+    .complete-name strong { font-weight: 500; }
+    .complete-text {
+      font-size: 14px;
+      font-weight: 300;
+      color: var(--text-light);
+      line-height: 1.95;
+      margin-bottom: 32px;
+      text-align: center;
+    }
+    .complete-text span { color: var(--text-faint); }
+    .bank-box {
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      padding: 28px 0;
+      margin-bottom: 22px;
+      text-align: center;
+    }
+    .bank-number {
+      font-size: 18px;
+      font-weight: 500;
+      color: var(--text);
+      letter-spacing: 0.04em;
+      margin-bottom: 6px;
+    }
+    .bank-holder {
+      font-size: 12px;
+      color: var(--text-faint);
+      font-weight: 400;
+      margin-bottom: 22px;
+      font-family: 'Pretendard', -apple-system, sans-serif;
+      letter-spacing: 0.04em;
+    }
+    #finalAmountDisplay {
+      font-size: 26px;
+      font-weight: 500;
+      color: var(--text);
+      letter-spacing: 0.02em;
+    }
+    #depositNotice {
+      font-size: 13px;
+      color: var(--text-light);
+      margin-bottom: 16px;
+      text-align: center;
+      line-height: 1.7;
+      font-weight: 300;
+    }
+    #depositNotice strong { color: var(--text); font-weight: 500; }
+    .action-btn-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .btn-sub-action {
+      flex: 1;
+      padding: 14px;
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: var(--r-sm);
+      font-size: 11px;
+      cursor: pointer;
+      text-decoration: none;
+      text-align: center;
+      display: block;
+      font-weight: 500;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       모달/바텀시트
+       ══════════════════════════════════════════════════════════ */
+    .modal-backdrop {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(42,37,32,0.32);
+      z-index: 800;
+      backdrop-filter: blur(3px);
+      -webkit-backdrop-filter: blur(3px);
+    }
+    .modal-backdrop.show { display: block; animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+
+    .bottom-sheet {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: var(--surface);
+      border-top-left-radius: var(--r-lg);
+      border-top-right-radius: var(--r-lg);
+      padding: 8px 28px calc(40px + env(safe-area-inset-bottom));
+      z-index: 900;
+      max-height: 88vh;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      transform: translateY(100%);
+      transition: transform 0.42s cubic-bezier(0.16,1,0.3,1);
+    }
+    .bottom-sheet.show { transform: translateY(0); }
+    .sheet-handle-area {
+      display: flex; justify-content: center;
+      padding: 12px 0 22px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .sheet-handle-bar {
+      width: 36px; height: 3px;
+      border-radius: 2px;
+      background: var(--text-dim);
+    }
+    .sheet-title {
+      font-family: 'Pretendard', -apple-system, sans-serif;
+      font-size: 18px;
+      font-weight: 400;
+      color: var(--text);
+      margin-bottom: 24px;
+      letter-spacing: 0.02em;
+    }
+    .sheet-sub-label {
+      font-size: 12px;
+      color: var(--text-faint);
+      margin-bottom: 18px;
+      line-height: 1.7;
+      font-family: 'Pretendard', -apple-system, sans-serif;
+    }
+    .sheet-close-btn {
+      position: absolute;
+      top: 22px; right: 24px;
+      background: none;
+      border: none;
+      font-size: 13px;
+      color: var(--text-faint);
+      cursor: pointer;
+      letter-spacing: 0.04em;
+    }
+
+    .oneday-inline { display: none; padding: 6px 4px 4px; }
+    .oneday-inline.active { display: block; animation: fadeIn 0.32s ease; }
+    .pass-options-wrap.hidden { display: none; }
+
+    /* ══════════════════════════════════════════════════════════
+       경고 토스트
+       ══════════════════════════════════════════════════════════ */
+    .custom-toast {
+      display: none;
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%) scale(0.93);
+      width: calc(100% - 52px); max-width: 340px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--r-md);
+      padding: 30px 26px 22px;
+      z-index: 1001;
+      opacity: 0;
+      transition:
+        opacity   0.5s cubic-bezier(0.16,1,0.3,1),
+        transform 0.5s cubic-bezier(0.16,1,0.3,1);
+    }
+    .custom-toast.show-toast {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+    .custom-toast-msg {
+      font-family: 'Pretendard', -apple-system, sans-serif;
+      font-size: 15px;
+      font-weight: 300;
+      color: var(--text);
+      line-height: 1.85;
+      white-space: pre-line;
+    }
+    .custom-toast-btn {
+      align-self: flex-end;
+      background: none;
+      border: none;
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--text);
+      cursor: pointer;
+      padding: 8px 0;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      font-family: 'Pretendard', sans-serif;
+    }
+
+    #receiptModalSheet .sheet-title { margin-top: 6px; }
+    #receiptNotice {
+      font-size: 13px;
+      color: var(--text-light);
+      line-height: 1.8;
+      margin-bottom: 22px;
+      font-weight: 300;
+      background: var(--surface-2);
+      padding: 14px 16px;
+      border-radius: var(--r-sm);
+      display: none;
+      font-family: 'Pretendard', -apple-system, sans-serif;
+    }
+    #receiptContent { font-size: 14px; line-height: 1.8; font-weight: 300; }
+
+    /* ── 5월 2일 공지 배너 ── */
+    .may2-notice-bar {
+      background: var(--surface-2);
+      border: 1px solid var(--line-soft);
+      border-radius: var(--r-sm);
+      padding: 12px 16px;
+      font-size: 12.5px;
+      line-height: 1.75;
+      color: var(--text);
+      font-family: 'Pretendard', -apple-system, sans-serif;
+      font-weight: 300;
+      letter-spacing: 0.02em;
+    }
+    .may2-notice-bar strong { font-weight: 600; }
+    /* 랜딩 About 섹션 안 (meta-row 사이에서 자연스럽게) */
+    .meta-row .may2-notice-bar {
+      margin-top: 8px;
+      font-size: 12px;
+    }
+    /* 신청폼 상단 배너 */
+    #may2BookingBar .may2-notice-bar {
+      margin-bottom: 20px;
+    }
+    /* 완료 화면 배너 */
+    #may2CompleteBar .may2-notice-bar {
+      margin-top: 20px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<div id="customAlert" class="custom-toast">
+  <div id="customAlertMsg" class="custom-toast-msg"></div>
+  <button class="custom-toast-btn" onclick="closeCustomAlert()">닫기</button>
+</div>
+
+<div class="modal-backdrop" id="infoModalBackdrop" onclick="closeCustomAlert()"></div>
+<div class="modal-backdrop" id="receiptModalBackdrop" onclick="toggleReceiptModal()"></div>
+
+<!-- 접수 내역 모달 -->
+<div class="bottom-sheet" id="receiptModalSheet">
+  <div class="sheet-handle-area" onclick="toggleReceiptModal()"><div class="sheet-handle-bar"></div></div>
+  <button class="sheet-close-btn" onclick="toggleReceiptModal()">CLOSE</button>
+  <h3 class="sheet-title">신청 내역</h3>
+  <div id="receiptNotice">
+    나마스떼.<br>접수가 완료되어 단계는 더 돌아가지 않아요.<br>신청 내역은 아래와 같고, 곧 문자로 인사드릴게요.
+  </div>
+  <div id="receiptContent"></div>
+  <button onclick="resetApp()" style="width:100%; margin-top:28px; padding:14px; background:transparent; color:var(--text); border:1px solid var(--line); border-radius:var(--r-sm); font-size:11px; cursor:pointer; letter-spacing:0.2em; text-transform:uppercase; font-weight:500; font-family:'Pretendard',sans-serif;">처음으로 돌아가기</button>
+</div>
+
+<!-- (모달 시트 제거됨 — 패스·캘린더는 모두 step 안에 인라인) -->
+
+<!-- 상단 유틸리티 바 -->
+<div class="top-bar" id="topBar">
+  <div class="top-logo">Root Vinyasa</div>
+  <a class="sms-contact" href="sms:01043130150" aria-label="문자로 문의하기">문의 ↗</a>
+</div>
+
+<!-- ═══ 랜딩 ═══ -->
+<div id="landing-stage">
+<section id="sec-hero">
+  <svg class="hero-circle" viewBox="0 0 360 360" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="180" cy="180" r="168" stroke="var(--text-faint)" stroke-width="0.6"/>
+    <circle cx="180" cy="180" r="120" stroke="var(--text-faint)" stroke-width="0.5" stroke-dasharray="1 6" opacity="0.5"/>
+  </svg>
+  <div class="hero-text">
+    <div class="hero-default">
+      <div class="hero-brand">Root Vinyasa</div>
+      <div class="hero-sub">단단하게 다지는 내면의 뿌리</div>
+    </div>
+    <div class="hero-return" id="heroReturn" aria-live="polite">
+      <p class="hero-return-greet"><strong id="heroReturnName"></strong>님, 다시 뵙게 되어 반갑습니다.</p>
+      <button type="button" class="hero-return-dismiss" onclick="dismissReturnHero()">다른 이름으로 시작하기</button>
+    </div>
+  </div>
+  <div class="hero-foot">Scroll</div>
+</section>
+
+<section id="sec-about">
+  <div class="about-grid">
+    <div class="section-eyebrow fi">About</div>
+    <div class="about-body fi">
+      호흡과 움직임을 끊임없이 연결하며<br>
+      내면의 뿌리를 단단하게 다지는<br>
+      빈야사 요가 수련입니다.<br><br>
+      완벽한 자세보다 끊이지 않는 호흡을,<br>
+      복잡한 생각보다 지금 이 순간의 감각을.
+    </div>
+    <div class="about-meta fi">
+      <div class="meta-row">
+        <span class="meta-key">Place</span>
+        <span class="meta-val">스튜디오 쿨라<a href="https://map.naver.com/p/search/%EC%8A%A4%ED%8A%9C%EB%94%94%EC%98%A4%20%EC%BF%A8%EB%9D%BC" target="_blank">지도 ↗</a></span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-key">When</span>
+        <span class="meta-val" id="whenMetaVal">매주 토요일 10:30<small>70분 수련</small></span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-key">Teacher</span>
+        <span class="meta-val">최승훈</span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-key">For</span>
+        <span class="meta-val">초보자부터 숙련자까지</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="sec-info">
+  <div class="info-inner">
+    <div class="section-eyebrow fi">Passes</div>
+    <div class="fi">
+      <div class="price-row">
+        <div class="price-name">원데이 클래스<small>한 번만 참석</small></div>
+        <div class="price-amt">35,000원</div>
+      </div>
+      <div class="price-row">
+        <div class="price-name">한 달<small>4주 수련</small></div>
+        <div class="price-amt">120,000원</div>
+      </div>
+      <div class="price-row">
+        <div class="price-name">두 달<small>8주 · 10,000원 할인</small></div>
+        <div class="price-amt">230,000원</div>
+      </div>
+      <div class="price-row">
+        <div class="price-name">세 달<small>12주 · 30,000원 할인</small></div>
+        <div class="price-amt">330,000원</div>
+      </div>
+      <div class="info-quiet">
+        연장 등록 시 한 달 110,000원 · 계좌이체 결제
+      </div>
+    </div>
+  </div>
+</section>
+</div><!-- /#landing-stage -->
+
+<!-- 플로팅 CTA -->
+<div class="cta-wrap" id="ctaWrap">
+  <button class="floating-cta" id="heroScrollBtn" onclick="handleStartClick()">클래스 신청</button>
+</div>
+
+<!-- ═══ 클래스 신청 폼 ═══ -->
+<section id="sec-booking">
+  <div class="book-inner">
+    <div class="book-sec-label">Application</div>
+    <div id="may2BookingBar"></div>
+
+    <!-- (랜딩 히어로의 returnHero로 이전됨 — 폼 안의 배너는 제거) -->
+
+    <!-- Step 1: 이름 -->
+    <div id="book-name" class="bk-step revealed">
+      <div class="bk-step-inner">
+        <div class="bk-summary" onclick="editStep('name')">
+          <span class="bk-sum-label">이름</span>
+          <span class="bk-sum-val" id="sum-name"></span>
+        </div>
+        <div class="bk-active-body">
+          <label for="userName" id="slide1Title" class="book-h">이름</label>
+          <div id="nameInputWrap">
+            <div class="name-row">
+              <input type="text" id="userName" enterkeyhint="done" autocomplete="off" spellcheck="false" autocorrect="off" autocapitalize="off" maxlength="10" placeholder="이름을 적어주세요.">
+            </div>
+            <div id="searchResultBox"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2: 연락처 -->
+    <div id="book-phone" class="bk-step">
+      <div class="bk-step-inner">
+        <div class="bk-summary" onclick="editStep('phone')">
+          <span class="bk-sum-label">연락처</span>
+          <span class="bk-sum-val" id="sum-phone"></span>
+        </div>
+        <div class="bk-active-body">
+          <label for="userPhone" class="book-h">연락처</label>
+          <input type="tel" id="userPhone" class="book-phone-input" maxlength="13" oninput="validatePhoneInput(this)" autocomplete="off" placeholder="010-0000-0000">
+          <div id="phoneError">010으로 시작하는 번호로 부탁드려요.</div>
+          <button class="btn-bottom" id="phoneConfirmBtn" onclick="saveNewPhone()" disabled>이대로 진행</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3: 패스 (인라인) -->
+    <div id="book-pass" class="bk-step">
+      <div class="bk-step-inner">
+        <div class="bk-summary" onclick="editStep('pass')">
+          <span class="bk-sum-label">패스</span>
+          <span class="bk-sum-val" id="sum-pass"></span>
+        </div>
+        <div class="bk-active-body">
+          <h2 class="book-h" id="passStepHeading">패스</h2>
+          <h3 id="pass-heading" class="book-sub-h" style="display:none;"></h3>
+          <div id="passOptionsBox"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 4: 원데이 인원 (인라인) -->
+    <div id="book-oneday" class="bk-step">
+      <div class="bk-step-inner">
+        <div class="bk-summary" onclick="editStep('oneday')">
+          <span class="bk-sum-label">인원</span>
+          <span class="bk-sum-val" id="sum-oneday"></span>
+        </div>
+        <div class="bk-active-body">
+          <h2 class="book-h">인원</h2>
+          <p class="bk-sub-label">몇 분이 함께하시나요?</p>
+          <div class="counter-box">
+            <button class="btn-circle" onclick="changeCount(-1)" aria-label="인원 감소">−</button>
+            <span id="personCount">1</span>
+            <button class="btn-circle" onclick="changeCount(1)" aria-label="인원 증가">+</button>
+          </div>
+          <div class="oneday-total-row">
+            총 <strong id="oneDayTotal">35,000원</strong>
+          </div>
+          <button class="btn-bottom" onclick="confirmOneday()">이 인원으로 진행</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 5: 시작일 (인라인 캘린더) -->
+    <div id="book-date" class="bk-step">
+      <div class="bk-step-inner">
+        <div class="bk-summary" onclick="editStep('date')">
+          <span class="bk-sum-label">시작일</span>
+          <span class="bk-sum-val" id="sum-date"></span>
+        </div>
+        <div class="bk-active-body">
+          <h2 class="book-h">시작일</h2>
+          <div class="cal-legend">
+            <div class="cal-legend-item"><span class="leg-dot leg-today"></span>오늘</div>
+            <div class="cal-legend-item"><span class="leg-dot leg-exp"></span>지금 패스 만료일</div>
+          </div>
+          <div class="calendar-header">
+            <button class="cal-nav-btn" onclick="changeMonth(-1)" aria-label="이전 달">◀</button>
+            <span id="calMonthText"></span>
+            <button class="cal-nav-btn" onclick="changeMonth(1)" aria-label="다음 달">▶</button>
+          </div>
+          <div class="calendar-grid" id="calGrid"></div>
+          <div id="preHolidayNotice"></div>
+          <div class="smart-notice-box" id="noDateMessage">
+            <p class="smart-notice-text">현재 신청 가능한 일정이 없습니다.</p>
+            <a href="sms:01043130150" class="btn-contact-help">강사님께 여쭤보기</a>
+          </div>
+          <div class="result-dates-box" id="resultDatesBox"></div>
+          <button class="btn-bottom" id="dateConfirmBtn" onclick="confirmDate()" disabled>이 일정으로 진행</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 6: 메모 + 동의 + 접수 -->
+    <div id="book-memo" class="bk-step">
+      <div class="bk-step-inner">
+        <div class="bk-summary" onclick="editStep('memo')">
+          <span class="bk-sum-label">메모</span>
+          <span class="bk-sum-val" id="sum-memo"></span>
+        </div>
+        <div class="bk-active-body">
+          <label for="userMemo" class="book-h">메모</label>
+          <p id="memoGuideText"></p>
+          <textarea id="userMemo" placeholder="남기고 싶은 말이 있다면 (선택)"></textarea>
+          <div id="finalDesc" style="display:none;"></div>
+          <div class="policy-box" id="dynamicPolicy"></div>
+          <div id="submitBtnWrapper">
+            <button class="btn-bottom" id="btnSubmit" onclick="submitData()" disabled>신청 완료하기</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ═══ 완료 화면 ═══ -->
+<section id="sec-complete">
+  <div class="complete-inner">
+    <div class="complete-label">Namaste</div>
+    <div class="complete-name"><strong id="displayUserName"></strong>님,<br>토요일이 기다려집니다.</div>
+    <div class="complete-text">
+      아래 계좌로 입금하시면 접수가 최종 확정됩니다.<br>
+      <span>확인 후 안내 문자를 보내드릴게요.</span>
+    </div>
+    <div id="may2CompleteBar"></div>
+    <div class="bank-box">
+      <div class="bank-number">국민 904736-56-545</div>
+      <div class="bank-holder">예금주 · 최승훈</div>
+      <div id="finalAmountDisplay"></div>
+    </div>
+    <p id="depositNotice"></p>
+    <button class="btn-bottom" id="btnCopy" onclick="copyAccountInfo()">계좌 정보 복사</button>
+    <div class="action-btn-group">
+      <button class="btn-sub-action" onclick="toggleReceiptModal()">신청 내역 보기</button>
+      <a href="sms:01043130150" class="btn-sub-action">강사님께 문자</a>
+    </div>
+  </div>
+</section>
+
+<script>
+  /* ══════════════════════════════════════════════════════════
+     DATA LAYER — 절대 건드리지 않을 것
+     ══════════════════════════════════════════════════════════ */
+  var appData = {
+    name:'', phoneMask:'', fullPhone:'', isNew:false,
+    passType:'정규', option:'', amount:0, persons:1,
+    startDate:'', endDate:'', weeksToCalc:0, memo:'',
+    onedayDiscount:0, onedayApplied:false, originalWeeks:0,
+    sessionText:'', occupiedDates:[], specialOldRule:false, expDate:''
+  };
+  var holidaysList=[], holidayReasons={}, holidayTypes={}, memberDB=[];
+  var sessionDates=[], skippedHolidayDates=[];
+  var currentNavYear, currentNavMonth;
+  var minValidDate, maxValidDate, totalValidDatesInWindow=0;
+  var ONE_DAY_PRICE=35000, BANK_INFO='국민 904736-56-545 최승훈';
+  var isFinalSubmitted=false, dataLoaded=false;
+
+  /* ── 5월 2일 수업 시간 변경 공지 (2026-05-03 KST 이후 자동 소멸) ── */
+  var MAY2_NOTICE_ACTIVE = (new Date() < new Date('2026-05-03T00:00:00+09:00'));
+  var MAY2_CLASS_DATE = '2026-05-02';
+  var MAY2_NOTICE_HTML = '<div class="may2-notice-bar">5월 2일(토) 수업은 <strong>11:00</strong> 시작이에요. 평소(10:30)와 달라요.</div>';
+
+  /* ══════════════════════════════════════════════════════════
+     VIEW LAYER
+     ══════════════════════════════════════════════════════════ */
+
+  (function() {
+    var io = new IntersectionObserver(function(entries) {
+      entries.forEach(function(e) { if (e.isIntersecting) { e.target.classList.add('on'); io.unobserve(e.target); } });
+    }, { threshold: 0.12 });
+    document.querySelectorAll('.fi').forEach(function(el) { io.observe(el); });
+  })();
+
+  // 5월 2일 공지 초기 주입
+  _initMay2Notices();
+
+  function showCustomAlert(msg) {
+    document.getElementById('customAlertMsg').innerText = msg;
+    document.getElementById('infoModalBackdrop').classList.add('show');
+    var alertEl = document.getElementById('customAlert');
+    alertEl.style.display = 'flex';
+    requestAnimationFrame(function(){ alertEl.classList.add('show-toast'); });
+  }
+  function closeCustomAlert() {
+    var alertEl = document.getElementById('customAlert');
+    alertEl.classList.remove('show-toast');
+    document.getElementById('infoModalBackdrop').classList.remove('show');
+    setTimeout(function(){ alertEl.style.display = 'none'; }, 400);
+  }
+
+  function toggleReceiptModal() {
+    var bd = document.getElementById('receiptModalBackdrop'), sh = document.getElementById('receiptModalSheet');
+    bd.classList.toggle('show'); sh.classList.toggle('show');
+    if (sh.classList.contains('show')) {
+      var noticeEl = document.getElementById('receiptNotice');
+      if (isFinalSubmitted) {
+        var noticeTxt = '나마스떼.<br>접수가 완료되어 단계는 더 돌아가지 않아요.<br>신청 내역은 아래와 같고, 곧 문자로 인사드릴게요.';
+        if (MAY2_NOTICE_ACTIVE) noticeTxt += '<br><br><strong>5월 2일(토) 수업은 11:00 시작이에요.</strong> 평소(10:30)와 달라요.';
+        noticeEl.innerHTML = noticeTxt;
+        noticeEl.style.display = 'block';
+      } else {
+        noticeEl.style.display = 'none';
+      }
+      lockBodyScroll();
+    }
+    else if (!_bookingSheetOpen) unlockBodyScroll();
+  }
+
+  function escapeHtml(str) { return String(str||'').replace(/[&<>"']/g,function(m){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m];}); }
+
+  var _savedScrollY = 0;
+  function lockBodyScroll() {
+    if (document.body.classList.contains('scroll-lock')) return;
+    _savedScrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
+    document.body.style.setProperty('--scroll-y', '-' + _savedScrollY + 'px');
+    document.body.classList.add('scroll-lock');
+  }
+  function unlockBodyScroll() {
+    if (!document.body.classList.contains('scroll-lock')) return;
+    document.body.classList.remove('scroll-lock');
+    document.body.style.removeProperty('--scroll-y');
+    window.scrollTo(0, _savedScrollY);
+  }
+  function fmtDate(d) { return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function shortDate(s) { return s.substring(5).replace('-','/'); }
+
+  /* ══════════════════════════════════════════════════════════
+     Step 관리
+     ══════════════════════════════════════════════════════════ */
+  var STEP_ORDER = ['name','phone','pass','oneday','date','memo'];
+  var _activeStepId = 'name';
+  var _stepProgress = [];
+
+  function _stepEl(sid) { return document.getElementById('book-' + sid); }
+
+  /* 활성 문항은 항상 최상단(order:0).
+     완료 문항은 그 아래로 — 최근 완료가 활성 바로 밑(작은 order), 오래된 것일수록 아래.
+     미완료(미래) 문항은 맨 아래에 잠겨 대기.
+     → 입력은 늘 화면 위, 키보드는 아래. 둘이 절대 겹치지 않는다. */
+  function _relayoutSteps() {
+    var total = STEP_ORDER.length;
+    for (var i = 0; i < total; i++) {
+      var id = STEP_ORDER[i];
+      var el = _stepEl(id);
+      if (!el) continue;
+      if (id === _activeStepId) {
+        el.style.order = '0';
+      } else {
+        var ci = _stepProgress.indexOf(id);
+        el.style.order = (ci !== -1) ? String(_stepProgress.length - ci) : String(total + 5);
+      }
+    }
+  }
+
+  /* 폼 컨테이너를 맨 위로 — 활성 문항이 order:0 이라 항상 최상단에 보인다.
+     새 문항을 '쫓아 내려가는' 스크롤이 사라진다. */
+  function _scrollFormToTop() {
+    var container = document.getElementById('sec-booking');
+    if (container) _smoothScrollIn(container, 0, 540);
+  }
+
+  /* 한 문항을 부드럽게 펼친다.
+     CSS Grid 0fr↔1fr 트릭이 브라우저 내부에서 콘텐츠 높이를 자동 보간하므로,
+     클래스만 토글하면 끝. JS 의 max-height 측정·해킹이 불필요해졌다.
+
+     단, .completed 상태에서 다시 펼칠 때(editStep 경로)는
+     grid-template-rows 값이 이미 1fr 라 transition 이 안 일어남.
+     → 잠깐 .revealed 를 떼서 0fr 로 보낸 뒤, 다음 프레임에 다시 붙여
+     0fr→1fr 사이클을 강제로 만들어 자연스러운 펼침을 보장. */
+  function _revealStep(el) {
+    if (!el) return;
+    var wasCompleted = el.classList.contains('completed');
+    el.classList.remove('completed', 'locked');
+    if (wasCompleted) {
+      el.classList.remove('revealed');
+      /* 강제 reflow — 브라우저가 0fr 상태를 인식하도록 */
+      void el.offsetWidth;
+      requestAnimationFrame(function() {
+        requestAnimationFrame(function() { el.classList.add('revealed'); });
+      });
+    } else {
+      el.classList.add('revealed');
+    }
+  }
+
+  /* 한 문항을 요약(완료) 상태로 접는다.
+     .completed 가 body 를 display:none 으로 만들면, Grid 가 콘텐츠 높이(요약 ~48px)에 맞춰 자동 수축. */
+  function _collapseStep(el) {
+    if (!el) return;
+    el.classList.add('completed');
+    el.classList.add('revealed');
+  }
+
+  function _updateSummary(sid) {
+    var el = document.getElementById('sum-' + sid);
+    if (!el) return;
+    switch(sid) {
+      case 'name': el.textContent = appData.name; break;
+      case 'phone':
+        var p = appData.fullPhone;
+        el.textContent = p ? p.slice(0,3)+'-'+p.slice(3,7)+'-'+p.slice(7) : (appData.phoneMask||'');
+        break;
+      case 'pass': {
+        /* "한 달 (4주) · 120,000원" — 패스명·기간·금액을 한 줄로 */
+        var amt = appData.amount ? ' · ' + appData.amount.toLocaleString() + '원' : '';
+        el.textContent = appData.option + amt;
+        break;
+      }
+      case 'oneday': el.textContent = appData.persons + '명  ·  ' + appData.amount.toLocaleString() + '원'; break;
+      case 'date': {
+        /* 시작일 ~ 종료일 · 총 N회 (· 휴강 N회 · 선택휴강 N회) */
+        if (!appData.startDate) { el.textContent = ''; break; }
+        if (appData.option === '원데이 클래스') {
+          el.textContent = shortDate(appData.startDate);
+          break;
+        }
+        var mandCnt = skippedHolidayDates.filter(function(d){return holidayTypes[d] !== '선택';}).length;
+        var optCnt  = skippedHolidayDates.filter(function(d){return holidayTypes[d] === '선택';}).length;
+        var parts = [shortDate(appData.startDate) + ' ~ ' + shortDate(appData.endDate),
+                     '총 ' + appData.weeksToCalc + '회'];
+        if (mandCnt > 0) parts.push('휴강 ' + mandCnt + '회');
+        if (optCnt  > 0) parts.push('선택휴강 ' + optCnt + '회');
+        el.textContent = parts.join(' · ');
+        break;
+      }
+      case 'memo': el.textContent = appData.memo || '(없음)'; break;
+    }
+  }
+
+  function activateStep(id) {
+    if (_activeStepId === id) {
+      var curEl = _stepEl(id);
+      if (curEl && !curEl.classList.contains('revealed')) _revealStep(curEl);
+      _relayoutSteps();
+      _scrollFormToTop();
+      return;
+    }
+    var prev = _activeStepId;
+    var prevEl = _stepEl(prev);
+    if (prevEl) {
+      _updateSummary(prev);
+      _collapseStep(prevEl);
+      if (_stepProgress.indexOf(prev) === -1) _stepProgress.push(prev);
+    }
+    var newEl = _stepEl(id);
+    if (!newEl) return;
+    _activeStepId = id;
+    /* 순서 재배치: 새 문항 → 최상단(order:0), 직전 문항 → 바로 아래 요약으로 */
+    _relayoutSteps();
+    /* 새 문항은 이미 최상단에 위치 — 제자리에서 차분히 펼쳐진다 */
+    _revealStep(newEl);
+    _scrollFormToTop();
+  }
+
+  /* 부드럽게 시작해서 부드럽게 멈추는 스크롤 (ease-in-out cubic) */
+  var _scrollAnim = null;
+  function _smoothScrollIn(target, targetY, duration) {
+    if (_scrollAnim) cancelAnimationFrame(_scrollAnim);
+    var isWindow = (target === window);
+    var startY = isWindow ? window.pageYOffset : target.scrollTop;
+    var dy = targetY - startY;
+    if (Math.abs(dy) < 2) return;
+    var startT = null;
+    function step(ts) {
+      if (startT === null) startT = ts;
+      var p = Math.min(1, (ts - startT) / duration);
+      var eased = p < 0.5 ? 4*p*p*p : 1 - Math.pow(-2*p+2, 3)/2;
+      var y = startY + dy * eased;
+      if (isWindow) window.scrollTo(0, y); else target.scrollTop = y;
+      if (p < 1) _scrollAnim = requestAnimationFrame(step);
+      else _scrollAnim = null;
+    }
+    _scrollAnim = requestAnimationFrame(step);
+  }
+
+  /**
+   * editStep — 이전 단계 summary 클릭 시 호출.
+   * 원칙: UI만 되돌리고, 값/입력은 절대 비우지 않는다.
+   * 사용자가 그 단계에서 *새 값을 선택* 할 때만(selectOption / selectDate / saveNewPhone 등)
+   * 그 시점에 이후 단계 데이터가 cascading 리셋된다.
+   */
+  function editStep(sid) {
+    var idx = STEP_ORDER.indexOf(sid);
+    if (idx < 0) return;
+    /* 이후 단계는 단순 hide — 데이터/콘텐츠는 보존 */
+    for (var i = idx + 1; i < STEP_ORDER.length; i++) {
+      var el = _stepEl(STEP_ORDER[i]);
+      if (!el) continue;
+      el.classList.remove('revealed', 'completed', 'active');
+    }
+    _stepProgress = _stepProgress.filter(function(s) { return STEP_ORDER.indexOf(s) < idx; });
+    _activeStepId = sid;
+    /* 편집할 문항이 최상단으로 떠오르고, 이후 문항은 다시 잠금 */
+    _relayoutSteps();
+
+    var targetEl = _stepEl(sid);
+    if (targetEl) {
+      _revealStep(targetEl);
+      _scrollFormToTop();
+    }
+
+    /* 단계별: 보조 동작만 (값은 보존) */
+    if (sid === 'name') {
+      var nameInput = document.getElementById('userName');
+      if (nameInput) setTimeout(function(){ nameInput.focus({ preventScroll: true }); }, 320);
+    } else if (sid === 'phone') {
+      var phoneInput = document.getElementById('userPhone');
+      if (phoneInput) setTimeout(function(){ phoneInput.focus({ preventScroll: true }); }, 320);
+      var pcb = document.getElementById('phoneConfirmBtn');
+      if (pcb) {
+        var curVal = (phoneInput && phoneInput.value || '').replace(/[^0-9]/g,'');
+        pcb.disabled = !(curVal.length===11 && curVal.slice(0,3)==='010');
+      }
+    } else if (sid === 'pass') {
+      /* 카드가 비어있으면 다시 그려준다 (편집을 위해 처음 들어올 때) */
+      var passBox = document.getElementById('passOptionsBox');
+      if (passBox && !passBox.children.length) renderPassOptions();
+    } else if (sid === 'oneday') {
+      var pcEl = document.getElementById('personCount'); if (pcEl) pcEl.innerText = appData.persons || 1;
+      var otEl = document.getElementById('oneDayTotal'); if (otEl) otEl.innerText = (appData.amount || ONE_DAY_PRICE).toLocaleString()+'원';
+    } else if (sid === 'date') {
+      /* 캘린더가 비어있으면 다시 그린다. 선택했던 날짜가 살아있으면 [확인] 활성. */
+      var calEl = document.getElementById('calGrid');
+      if (calEl && !calEl.children.length) setupCalendarEnv();
+      var dcb = document.getElementById('dateConfirmBtn');
+      if (dcb) dcb.disabled = !appData.startDate;
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     Landing ↔ Form 전환
+     ══════════════════════════════════════════════════════════ */
+  var _bookingSheetOpen = false;
+  var _sheetHistoryPushed = false;
+  var _dataLoadPoller = null;
+
+  function openBookingSheet() {
+    if (_bookingSheetOpen) return;
+    _bookingSheetOpen = true;
+    document.body.classList.add('form-active');
+    var booking = document.getElementById('sec-booking');
+    booking.scrollTop = 0;
+    _relayoutSteps();
+    if (!_sheetHistoryPushed) { history.pushState({sheet:true},''); _sheetHistoryPushed=true; }
+    if (!dataLoaded) {
+      document.getElementById('slide1Title').innerHTML = '안전하게 정보를<br>불러오는 중입니다.';
+      if (_dataLoadPoller) clearInterval(_dataLoadPoller);
+      _dataLoadPoller = setInterval(function() {
+        if (dataLoaded) { clearInterval(_dataLoadPoller); _dataLoadPoller=null; document.getElementById('slide1Title').innerHTML = '이름'; }
+      }, 120);
+    }
+    setTimeout(function() {
+      var userNameEl = document.getElementById('userName');
+      if (userNameEl && _activeStepId === 'name') userNameEl.focus({ preventScroll: true });
+    }, 620);
+  }
+
+  function closeBookingSheet() {
+    if (!_bookingSheetOpen) return;
+    _bookingSheetOpen = false;
+    document.body.classList.remove('form-active');
+    unlockBodyScroll();
+  }
+
+  /* 뒤로가기 처리 — 접수 이후에는 즉시 pushState로 되돌려서 뒤로가기 차단 */
+  window.addEventListener('popstate', function(e) {
+    if (isFinalSubmitted) {
+      /* 접수 완료 후 뒤로가기 차단 */
+      history.pushState({locked:true}, '');
+      return;
+    }
+    if (_passSheetOpen) { closePassSheet(); return; }
+    if (_calSheetOpen)  { closeCalendarSheet(); return; }
+    if (_bookingSheetOpen) { closeBookingSheet(); _sheetHistoryPushed=false; }
+  });
+
+  function resetAppDataFrom(stepId) {
+    var idx = STEP_ORDER.indexOf(stepId);
+    if (idx <= STEP_ORDER.indexOf('name')) {
+      appData.name=''; appData.phoneMask=''; appData.fullPhone=''; appData.isNew=false;
+      document.getElementById('userName').value='';
+      document.getElementById('searchResultBox').innerHTML='';
+    }
+    if (idx <= STEP_ORDER.indexOf('phone')) {
+      appData.fullPhone='';
+      var phoneEl = document.getElementById('userPhone');
+      if (phoneEl) phoneEl.value='';
+      document.getElementById('phoneError').style.display='none';
+    }
+    if (idx <= STEP_ORDER.indexOf('pass')) {
+      appData.option=''; appData.amount=0; appData.weeksToCalc=0; appData.persons=1;
+      var passBox = document.getElementById('passOptionsBox');
+      if (passBox) passBox.innerHTML='';
+    }
+    if (idx <= STEP_ORDER.indexOf('date')) {
+      appData.startDate=''; appData.endDate=''; appData.sessionText='';
+      sessionDates=[]; skippedHolidayDates=[];
+      minValidDate=null; maxValidDate=null; totalValidDatesInWindow=0;
+      var rdBox = document.getElementById('resultDatesBox');
+      if (rdBox) { rdBox.style.display='none'; rdBox.innerHTML=''; }
+      var calEl = document.getElementById('calGrid');
+      if (calEl) calEl.innerHTML='';
+      var dcb = document.getElementById('dateConfirmBtn');
+      if (dcb) dcb.disabled = true;
+    }
+    if (idx <= STEP_ORDER.indexOf('memo')) {
+      appData.memo='';
+      var memoEl = document.getElementById('userMemo');
+      if (memoEl) memoEl.value='';
+    }
+  }
+
+  function showComplete() {
+    document.body.classList.add('complete-active');
+    document.body.classList.remove('form-active');
+    var sec = document.getElementById('sec-complete');
+    sec.classList.add('visible');
+    /* 뒤로가기 차단을 위해 추가 push — popstate 핸들러가 리바인드 */
+    history.pushState({locked:true}, '');
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     재방문자
+     ══════════════════════════════════════════════════════════ */
+  function saveUserLocal(name, phoneMask, fullPhone) {
+    /* 다음 방문 자동인식을 위해 last4(휴대폰 끝 4자리)도 저장.
+       서버 phoneMask는 충돌 여부에 따라 'XXXX'/'XXX*'/'XX**' 형태로 가변 → 매번 달라질 수 있음. */
+    var last4 = (fullPhone && fullPhone.length >= 4) ? fullPhone.slice(-4) : '';
+    try { localStorage.setItem('rv_user', JSON.stringify({name:name, phoneMask:phoneMask||'', last4:last4})); } catch(e) {}
+  }
+  function getUserLocal() { try { var v=localStorage.getItem('rv_user'); return v?JSON.parse(v):null; } catch(e){return null;} }
+  function clearUserLocal() { try { localStorage.removeItem('rv_user'); } catch(e){} }
+
+  /* 저장된 식별자(phoneMask 또는 last4)와 멤버의 마스크가 매치되는지 확인 */
+  function _maskMatches(memberMask, savedPhoneMask, savedLast4) {
+    if (!memberMask) return false;
+    if (savedPhoneMask && memberMask === savedPhoneMask) return true;
+    if (!savedLast4) return false;
+    /* 'XXXX' (4자 숫자, 충돌형): 끝 4자리와 동일 */
+    if (/^\d{4}$/.test(memberMask)) return memberMask === savedLast4;
+    /* 'XXX*' (3자리 + *): 끝 4자리의 앞 3자가 일치 */
+    if (/^\d{3}\*$/.test(memberMask)) return savedLast4.indexOf(memberMask.slice(0,3)) === 0;
+    /* 'XX**' (2자리 + **): 끝 4자리의 앞 2자가 일치 */
+    if (/^\d{2}\*\*$/.test(memberMask)) return savedLast4.indexOf(memberMask.slice(0,2)) === 0;
+    return false;
+  }
+
+  function checkReturningUser() {
+    var saved = getUserLocal();
+    if (!saved||!saved.name) return;
+    var foundIdx = -1;
+    for (var i=0; i<memberDB.length; i++) {
+      if (memberDB[i].name !== saved.name) continue;
+      if (_maskMatches(memberDB[i].phoneMask, saved.phoneMask, saved.last4)) { foundIdx=i; break; }
+    }
+    if (foundIdx<0) { clearUserLocal(); return; }
+    window._returnMemberIdx = foundIdx;
+    /* 히어로 원 안의 큰 글씨를 인사말로 교체 */
+    var nameEl = document.getElementById('heroReturnName');
+    if (nameEl) nameEl.textContent = saved.name;
+    document.body.classList.add('is-return');
+    /* CTA 텍스트도 컨텍스트에 맞게 */
+    var ctaBtn = document.getElementById('heroScrollBtn');
+    if (ctaBtn) ctaBtn.textContent = '클래스 신청';
+    if (_bookingSheetOpen) { setUserAuthByIndex(foundIdx); }
+  }
+
+  /* 랜딩 [클래스 신청] 클릭 — 재방문자면 자동 채워서 pass로 직행 */
+  function handleStartClick() {
+    if (typeof window._returnMemberIdx !== 'undefined' && window._returnMemberIdx >= 0) {
+      continueAsReturn();
+    } else {
+      openBookingSheet();
+    }
+  }
+
+  function continueAsReturn() {
+    if (typeof window._returnMemberIdx !== 'undefined' && window._returnMemberIdx >= 0) {
+      openBookingSheet();
+      setTimeout(function() { setUserAuthByIndex(window._returnMemberIdx); }, 400);
+    }
+  }
+
+  /* 히어로 인사말 끄고 기본 큰 글씨로 복원 */
+  function dismissReturnHero() {
+    document.body.classList.remove('is-return');
+    var ctaBtn = document.getElementById('heroScrollBtn');
+    if (ctaBtn) ctaBtn.textContent = '클래스 신청';
+    window._returnMemberIdx = -1;
+    clearUserLocal();
+  }
+
+  /* 구버전 호환용 stub — 외부 호출처는 더 이상 없음 */
+  function dismissReturn() { dismissReturnHero(); }
+
+  window.onload = function() {
+    google.script.run
+      .withSuccessHandler(function(data) {
+        holidaysList=data.holidays||[]; holidayReasons=data.holidayReasons||{};
+        holidayTypes=data.holidayTypes||{}; memberDB=data.members||[];
+        dataLoaded=true;
+        checkReturningUser();
+        /* 데이터 로드 완료 — 그제야 CTA 등장 */
+        document.body.classList.add('data-loaded');
+      })
+      .withFailureHandler(function() { showCustomAlert('일시적인 오류가 발생했습니다.\n잠시 후 다시 시도해 주세요.'); })
+      .getInitialData();
+  };
+
+  window.addEventListener('beforeunload', function(e) {
+    if (!isFinalSubmitted && _bookingSheetOpen && _activeStepId !== 'name') { e.preventDefault(); e.returnValue=''; }
+  });
+
+  /* ══════════════════════════════════════════════════════════
+     이름 / 동명이인 / 신규
+     ══════════════════════════════════════════════════════════ */
+  /* 진행 가능한 이름인지 — 2~10자 한글/영문 */
+  function _isValidName(v) {
+    return !!v && v.length >= 2 && /^[가-힣A-Za-z\s]{2,10}$/.test(v);
+  }
+
+  function showNameResults(nameInput) {
+    var box=document.getElementById('searchResultBox'); box.innerHTML='';
+    if (!nameInput||nameInput.length<1) return;
+    var matches = dataLoaded ? memberDB.filter(function(m){ return m.name===nameInput; }) : [];
+    if (matches.length===0) {
+      /* 일치 회원 없음 → 신규. 버튼 없이 바로 전화번호 단계로 (유효한 이름일 때만) */
+      if (dataLoaded && _isValidName(nameInput) && _activeStepId==='name') handleNewUser();
+      return;
+    }
+    var hasCollision=matches.some(function(m){ return m.isCollision; });
+    if (hasCollision) {
+      var note=document.createElement('div'); note.className='collision-note';
+      note.textContent='같은 이름의 수련자가 있습니다. 번호 끝 네 자리를 입력해 주세요.';
+      box.appendChild(note);
+      var inp=document.createElement('input'); inp.type='tel'; inp.maxLength=4; inp.placeholder='번호 끝 네 자리'; inp.className='collision-input';
+      var _verifyInFlight = false;
+      inp.addEventListener('input', function() {
+        var self = this;
+        var val = this.value.replace(/[^0-9]/g,''); this.value = val;
+        if (val.length === 4 && !_verifyInFlight) {
+          /* 충돌 경우엔 서버가 last-4 를 클라이언트에 보내지 않음 — 서버에서 검증 */
+          _verifyInFlight = true;
+          self.disabled = true;
+          google.script.run
+            .withSuccessHandler(function(verified) {
+              _verifyInFlight = false;
+              self.disabled = false;
+              if (verified) {
+                memberDB.push(verified);
+                setUserAuthByIndex(memberDB.length - 1);
+              } else {
+                showCustomAlert('일치하는 회원을 찾을 수 없어요.\n끝 네 자리를 다시 확인해 주세요.');
+                self.value = '';
+                self.focus({ preventScroll: true });
+              }
+            })
+            .withFailureHandler(function() {
+              _verifyInFlight = false;
+              self.disabled = false;
+              showCustomAlert('일시적인 오류가 발생했습니다.\n잠시 후 다시 시도해 주세요.');
+            })
+            .verifyCollisionMember(nameInput, val);
+        }
+      });
+      box.appendChild(inp);
+    } else {
+      matches.forEach(function(m) {
+        var card=document.createElement('button'); card.className='member-card';
+        var ph=document.createElement('div'); ph.className='member-card-phone'; ph.textContent=m.phoneMask;
+        card.appendChild(ph);
+        (function(member){ card.onclick=function(){ setUserAuthByIndex(memberDB.indexOf(member)); }; })(m);
+        box.appendChild(card);
+      });
+    }
+    /* 동명이인 후보 중 본인이 없을 수도 — 안전장치 ("저는 처음 와봐요") */
+    var newBtn=document.createElement('button'); newBtn.className='btn-new-user';
+    newBtn.textContent='저는 처음 와봐요';
+    newBtn.onclick=handleNewUser; box.appendChild(newBtn);
+    /* 결과 항목이 차례로 차분히 떠오르도록 — 미세한 스태거 */
+    for (var ki=0; ki<box.children.length; ki++) {
+      box.children[ki].style.animationDelay = (ki*70) + 'ms';
+    }
+  }
+
+  document.getElementById('userName').addEventListener('keydown', function(e) {
+    if (e.key !== 'Enter' && e.keyCode !== 13) return;
+    e.preventDefault();
+    var v = this.value.trim();
+    var matched = dataLoaded && v.length >= 1 && memberDB.some(function(m){ return m.name === v; });
+    if (matched) {
+      this.blur();                       /* 기존 회원 — 키보드 내려가고 본인 카드 확인 */
+    } else if (_isValidName(v)) {
+      if (dataLoaded) handleNewUser();    /* 신규 — 버튼 없이 바로 전화번호 단계로 */
+      else this.blur();                  /* 데이터 로딩 중 — 키보드만 정리 */
+    }
+    /* 이름이 아직 미완성이면 아무것도 안 함 — 키보드 유지, 계속 입력 */
+  });
+  document.getElementById('userName').addEventListener('blur', function() {
+    var v = this.value.trim();
+    if (v.length >= 1) {
+      /* 결과 렌더를 한 박자 미룬다 — 키보드가 내려가는 동안 검색결과 칸을 비워두어,
+         안드로이드 키보드의 포커스 이동(다음 요소로)이 방금 만든 번호 카드로 옮겨가
+         화면이 아래로 끌려 내려가는 것을 막는다 */
+      setTimeout(function() {
+        if (document.activeElement !== document.getElementById('userName')) showNameResults(v);
+      }, 80);
+    } else {
+      document.getElementById('searchResultBox').innerHTML = '';
+    }
+  });
+  document.getElementById('userName').addEventListener('focus', function() {
+    document.getElementById('searchResultBox').innerHTML = '';
+  });
+
+  function setUserAuthByIndex(idx) {
+    var m = memberDB[idx];
+    /* 같은 회원을 다시 고른 경우엔 cascading 리셋 없이 패스 단계로만 이동 */
+    var memberChanged = (appData.name !== m.name) || (appData.phoneMask !== m.phoneMask);
+    appData.occupiedDates = m.occupiedDates || [];
+    appData.name = m.name; appData.phoneMask = m.phoneMask;
+    appData.isNew = false; appData.expDate = m.expDate || ''; appData.specialOldRule = m.specialOldRule || false;
+    appData.onedayDiscount = m.onedayDiscount || 0;  // 원데이 할인 금액 (0=없음)
+    if (m.type === '특정') appData.passType = '특정';
+    else if (m.isEligible) appData.passType = '연장';
+    else appData.passType = '정규';
+    if (memberChanged) {
+      appData.fullPhone = '';
+      appData.option = ''; appData.amount = 0; appData.weeksToCalc = 0; appData.persons = 1;
+      appData.onedayApplied = false; appData.originalWeeks = 0;
+      appData.startDate = ''; appData.endDate = ''; appData.sessionText = '';
+      sessionDates = []; skippedHolidayDates = [];
+      ['phone','pass','oneday','date','memo'].forEach(function(sid) {
+        var el = _stepEl(sid);
+        if (el) { el.classList.remove('revealed','completed','active'); }
+      });
+      _stepProgress = ['name'];
+      _activeStepId = 'name';
+    }
+    /* 기존 회원: phone 단계 건너뛰고 바로 pass로 */
+    renderPassOptions();
+    activateStep('pass');
+  }
+
+  function handleNewUser() {
+    var rawName=document.getElementById('userName').value.trim();
+    if (!rawName) { showCustomAlert('이름을 적어주세요.'); document.getElementById('userName').focus({ preventScroll: true }); return; }
+    if (rawName.length<2) { showCustomAlert('이름은 두 글자 이상으로 적어주세요.'); document.getElementById('userName').focus({ preventScroll: true }); return; }
+    if (!/^[가-힣A-Za-z\s]{2,10}$/.test(rawName)) { showCustomAlert('이름은 한글 또는 영문으로 부탁드려요.'); document.getElementById('userName').focus({ preventScroll: true }); return; }
+    /* 이름이 *바뀐* 경우엔 이후 단계 데이터(연락처·옵션·날짜·메모) cascading 리셋 */
+    var nameChanged = (appData.name !== rawName) || !appData.isNew;
+    appData.name=rawName;
+    appData.isNew=true; appData.passType='정규'; appData.phoneMask=''; appData.occupiedDates=[]; appData.expDate=''; appData.specialOldRule=false;
+    if (nameChanged) {
+      appData.fullPhone='';
+      appData.option=''; appData.amount=0; appData.weeksToCalc=0; appData.persons=1;
+      appData.startDate=''; appData.endDate=''; appData.sessionText=''; appData.memo='';
+      sessionDates=[]; skippedHolidayDates=[];
+      var phEl = document.getElementById('userPhone'); if (phEl) phEl.value='';
+      var phErr = document.getElementById('phoneError'); if (phErr) phErr.style.display='none';
+      var pcb = document.getElementById('phoneConfirmBtn'); if (pcb) pcb.disabled=true;
+      var pob = document.getElementById('passOptionsBox'); if (pob) pob.innerHTML='';
+      var rdb = document.getElementById('resultDatesBox'); if (rdb) { rdb.style.display='none'; rdb.innerHTML=''; }
+      var calEl2 = document.getElementById('calGrid'); if (calEl2) calEl2.innerHTML='';
+      var dcb3 = document.getElementById('dateConfirmBtn'); if (dcb3) dcb3.disabled=true;
+      var memoEl = document.getElementById('userMemo'); if (memoEl) memoEl.value='';
+      ['phone','pass','oneday','date','memo'].forEach(function(sid) {
+        var el = _stepEl(sid);
+        if (el) { el.classList.remove('revealed','completed','active'); }
+      });
+      _stepProgress = ['name'];
+      _activeStepId = 'name';
+    }
+    activateStep('phone');
+    /* 신규 회원 — 전화번호 칸을 바로 띄워 키보드가 자연스럽게 이어지게 (토스풍 흐름) */
+    setTimeout(function() {
+      if (_activeStepId === 'phone') {
+        var pe = document.getElementById('userPhone');
+        if (pe) pe.focus({ preventScroll: true });
+      }
+    }, 100);
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     연락처
+     ══════════════════════════════════════════════════════════ */
+  function validatePhoneInput(el) {
+    var val=el.value.replace(/[^0-9]/g,'');
+    if (val.length>3&&val.length<=7) el.value=val.slice(0,3)+'-'+val.slice(3);
+    else if (val.length>7) el.value=val.slice(0,3)+'-'+val.slice(3,7)+'-'+val.slice(7);
+    else el.value=val;
+    var errEl=document.getElementById('phoneError');
+    var confirmBtn=document.getElementById('phoneConfirmBtn');
+    var isValid = (val.length===11 && val.slice(0,3)==='010');
+    if (val.length>=3 && val.slice(0,3)!=='010') { errEl.style.display='block'; if (confirmBtn) confirmBtn.disabled=true; return; }
+    if (val.length===11) {
+      if (val.slice(0,3)!=='010') { errEl.style.display='block'; if (confirmBtn) confirmBtn.disabled=true; return; }
+      errEl.style.display='none';
+      if (confirmBtn) confirmBtn.disabled=false;
+      setTimeout(saveNewPhone, 750);
+    } else {
+      errEl.style.display='none';
+      if (confirmBtn) confirmBtn.disabled = !isValid;
+    }
+  }
+
+  function saveNewPhone() {
+    /* phone 단계를 이미 지나간 뒤에 setTimeout이 뒤늦게 발화하더라도 뒤로 끌고가지 않게 */
+    if (_activeStepId !== 'phone') return;
+    var newPhone = document.getElementById('userPhone').value.replace(/[^0-9]/g,'');
+    if (newPhone.length !== 11 || newPhone.slice(0,3) !== '010') return;
+    /* 연락처가 바뀐 순간 — 이후 단계(패스·캘린더 등) cascading 리셋 */
+    if (newPhone !== appData.fullPhone) {
+      appData.option=''; appData.amount=0; appData.weeksToCalc=0; appData.persons=1;
+      appData.startDate=''; appData.endDate=''; appData.sessionText='';
+      sessionDates=[]; skippedHolidayDates=[];
+      var rdb = document.getElementById('resultDatesBox');
+      if (rdb) { rdb.style.display='none'; rdb.innerHTML=''; }
+      var dcb = document.getElementById('dateConfirmBtn');
+      if (dcb) dcb.disabled = true;
+    }
+    appData.fullPhone = newPhone;
+    renderPassOptions();
+    activateStep('pass');
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     패스 바텀시트
+     ══════════════════════════════════════════════════════════ */
+  var _passSheetOpen = false;
+
+  function renderPassOptions() {
+    var box=document.getElementById('passOptionsBox'); box.innerHTML='';
+    var h=document.getElementById('pass-heading');
+    if (h) {
+      if (appData.isNew) { h.innerHTML='어떻게 시작해볼까요'; }
+      else if (appData.passType==='특정') { h.innerHTML=escapeHtml(appData.name)+'님께 드리는 패스'; }
+      else if (appData.passType==='연장') { h.innerHTML=escapeHtml(appData.name)+'님 · 이어가기'; }
+      else { h.innerHTML=escapeHtml(appData.name)+'님 · 다시 한 번'; }
+    }
+    var passStepH = document.getElementById('passStepHeading');
+    if (passStepH) {
+      if (appData.isNew) passStepH.innerHTML = '패스';
+      else passStepH.innerHTML = escapeHtml(appData.name) + '님';
+    }
+    var od = appData.onedayDiscount; // 1인당 원데이 할인 금액 (0이면 없음)
+    var odS = od > 0 ? od.toLocaleString() : '';
+
+    if (appData.passType==='특정') {
+      // 특정 패스 — 원데이 할인 미적용
+      var wks=appData.specialOldRule?5:4;
+      box.innerHTML='<p class="pass-section-label">특별 패스</p><button class="btn-option" onclick="selectOption(\'특별 패스 ('+wks+'회)\',100000,'+wks+')"><div><div class="opt-title">특별 패스 ('+wks+'회)</div></div><div class="opt-price">100,000원</div></button>';
+
+    } else if (appData.passType==='연장' && od > 0) {
+      // 연장 + 원데이 할인 동시 적용
+      box.innerHTML=
+        '<p class="pass-section-label">원데이 할인</p>'+
+        '<button class="btn-option" onclick="selectOptionOD(\'원데이 할인 한 달 (4주)\',110000,4,'+od+')">'+
+          '<div><div class="opt-title">한 달 이어가기 (3회)</div></div>'+
+          '<div class="opt-price">'+(110000-od).toLocaleString()+'원<span class="discount-badge">-'+odS+'원</span></div></button>'+
+        '<button class="btn-option" onclick="selectOption(\'원데이 클래스\',35000,1)">'+
+          '<div><div class="opt-title">원데이 클래스 (1회)</div></div>'+
+          '<div class="opt-price">35,000원</div></button>'+
+        '<button class="pass-more-toggle" onclick="togglePassMore(this)"><span>＋ 다른 기간 더보기</span><span>＋</span></button>'+
+        '<div class="pass-more-section">'+
+          '<button class="btn-option" onclick="selectOptionOD(\'원데이 할인 두 달 (8주)\',210000,8,'+od+')">'+
+            '<div><div class="opt-title">두 달 (7회)</div></div>'+
+            '<div class="opt-price">'+(210000-od).toLocaleString()+'원<span class="discount-badge">-'+odS+'원</span></div></button>'+
+          '<button class="btn-option" onclick="selectOptionOD(\'원데이 할인 세 달 (12주)\',300000,12,'+od+')">'+
+            '<div><div class="opt-title">세 달 (11회)</div></div>'+
+            '<div class="opt-price">'+(300000-od).toLocaleString()+'원<span class="discount-badge">-'+odS+'원</span></div></button>'+
+        '</div>';
+
+    } else if (appData.passType==='연장') {
+      // 연장 — 기존
+      box.innerHTML='<p class="pass-section-label">연장 할인</p><button class="btn-option" onclick="selectOption(\'연장 할인 한 달 (4주)\',110000,4)"><div><div class="opt-title">한 달 이어가기 (4주)</div></div><div class="opt-price">110,000원</div></button><button class="btn-option" onclick="selectOption(\'원데이 클래스\',35000,1)"><div><div class="opt-title">원데이 클래스 (1회)</div></div><div class="opt-price">35,000원</div></button><button class="pass-more-toggle" onclick="togglePassMore(this)"><span>＋ 다른 기간 더보기</span><span>＋</span></button><div class="pass-more-section"><button class="btn-option" onclick="selectOption(\'연장 할인 두 달 (8주)\',210000,8)"><div><div class="opt-title">두 달 (8주)</div></div><div class="opt-price">210,000원<span class="discount-badge">-10,000원</span></div></button><button class="btn-option" onclick="selectOption(\'연장 할인 세 달 (12주)\',300000,12)"><div><div class="opt-title">세 달 (12주)</div></div><div class="opt-price">300,000원<span class="discount-badge">-30,000원</span></div></button></div>';
+
+    } else if (appData.isNew) {
+      // 신규 — 원데이 할인 없음 (신규라면 oneday 이력이 없는 상태)
+      box.innerHTML='<button class="btn-option" onclick="selectOption(\'원데이 클래스\',35000,1)"><div><div class="opt-title">원데이 클래스 (1회)</div></div><div class="opt-price">35,000원</div></button><button class="btn-option" onclick="selectOption(\'한 달 (4주)\',120000,4)"><div><div class="opt-title">한 달 시작하기 (4주)</div></div><div class="opt-price">120,000원</div></button><button class="pass-more-toggle" onclick="togglePassMore(this)"><span>＋ 다른 기간 더보기</span><span>＋</span></button><div class="pass-more-section"><button class="btn-option" onclick="selectOption(\'두 달 (8주)\',230000,8)"><div><div class="opt-title">두 달 (8주)</div></div><div class="opt-price">230,000원<span class="discount-badge">-10,000원</span></div></button><button class="btn-option" onclick="selectOption(\'세 달 (12주)\',330000,12)"><div><div class="opt-title">세 달 (12주)</div></div><div class="opt-price">330,000원<span class="discount-badge">-30,000원</span></div></button></div>';
+
+    } else if (od > 0) {
+      // 재방문 정규 + 원데이 할인
+      box.innerHTML=
+        '<p class="pass-section-label">원데이 할인</p>'+
+        '<button class="btn-option" onclick="selectOptionOD(\'원데이 할인 한 달 (4주)\',120000,4,'+od+')">'+
+          '<div><div class="opt-title">한 달 시작하기 (3회)</div></div>'+
+          '<div class="opt-price">'+(120000-od).toLocaleString()+'원<span class="discount-badge">-'+odS+'원</span></div></button>'+
+        '<button class="btn-option" onclick="selectOption(\'원데이 클래스\',35000,1)">'+
+          '<div><div class="opt-title">원데이 클래스 (1회)</div></div>'+
+          '<div class="opt-price">35,000원</div></button>'+
+        '<button class="pass-more-toggle" onclick="togglePassMore(this)"><span>＋ 다른 기간 더보기</span><span>＋</span></button>'+
+        '<div class="pass-more-section">'+
+          '<button class="btn-option" onclick="selectOptionOD(\'원데이 할인 두 달 (8주)\',230000,8,'+od+')">'+
+            '<div><div class="opt-title">두 달 (7회)</div></div>'+
+            '<div class="opt-price">'+(230000-od).toLocaleString()+'원<span class="discount-badge">-'+odS+'원</span></div></button>'+
+          '<button class="btn-option" onclick="selectOptionOD(\'원데이 할인 세 달 (12주)\',330000,12,'+od+')">'+
+            '<div><div class="opt-title">세 달 (11회)</div></div>'+
+            '<div class="opt-price">'+(330000-od).toLocaleString()+'원<span class="discount-badge">-'+odS+'원</span></div></button>'+
+        '</div>';
+
+    } else {
+      // 재방문 정규 — 기존
+      box.innerHTML='<button class="btn-option" onclick="selectOption(\'한 달 (4주)\',120000,4)"><div><div class="opt-title">한 달 이어가기 (4주)</div></div><div class="opt-price">120,000원</div></button><button class="btn-option" onclick="selectOption(\'원데이 클래스\',35000,1)"><div><div class="opt-title">원데이 클래스 (1회)</div></div><div class="opt-price">35,000원</div></button><button class="pass-more-toggle" onclick="togglePassMore(this)"><span>＋ 다른 기간 더보기</span><span>＋</span></button><div class="pass-more-section"><button class="btn-option" onclick="selectOption(\'두 달 (8주)\',230000,8)"><div><div class="opt-title">두 달 (8주)</div></div><div class="opt-price">230,000원<span class="discount-badge">-10,000원</span></div></button><button class="btn-option" onclick="selectOption(\'세 달 (12주)\',330000,12)"><div><div class="opt-title">세 달 (12주)</div></div><div class="opt-price">330,000원<span class="discount-badge">-30,000원</span></div></button></div>';
+    }
+  }
+
+  /* ── 원데이 할인 패스 선택 ─────────────────────────────────────────
+     origWeeks: 원본 주수(4/8/12) — option 이름에 포함돼 서버가 weeks 파싱에 사용
+     discountAmt: 1인당 원데이 가격 (동적, 35000 하드코딩 아님)
+     weeksToCalc = origWeeks - 1 (실제 수업 횟수), amount = basePrice - discountAmt
+     originalWeeks 보존 → 쉬어가기 계산(pauseCount)에 사용                        */
+  function selectOptionOD(optName, basePrice, origWeeks, discountAmt) {
+    appData.onedayApplied = true;
+    appData.originalWeeks = origWeeks;
+    selectOption(optName, basePrice - discountAmt, origWeeks - 1);
+  }
+
+  /* 인라인 전환 — 모달 함수들은 stub로 유지 (다른 곳 호출 보호) */
+  function openPassSheet()  { activateStep('pass'); }
+  function closePassSheet() { _passSheetOpen = false; }
+
+  function togglePassMore(btn) {
+    var sec=btn.nextElementSibling;
+    var open=sec.classList.toggle('open');
+    btn.querySelector('span:first-child').textContent = open ? '－ 접기' : '＋ 다른 기간 더보기';
+    btn.querySelector('span:last-child').textContent = open ? '－' : '＋';
+  }
+
+  /* 스마트 리셋 — 클래스 유형 자체(원데이 ↔ 기간권)가 바뀔 때만 시작일/일정 초기화.
+     같은 가족 안에서의 변경(한 달 → 두 달, 인원수 +/-)은 시작일을 보존하고 일정만 재계산. */
+  function _resetSchedule() {
+    appData.startDate = ''; appData.endDate = ''; appData.sessionText = '';
+    sessionDates = []; skippedHolidayDates = [];
+    var rdb = document.getElementById('resultDatesBox');
+    if (rdb) { rdb.style.display = 'none'; rdb.innerHTML = ''; }
+    var dcb = document.getElementById('dateConfirmBtn');
+    if (dcb) dcb.disabled = true;
+  }
+
+  function _recomputeScheduleFromStart() {
+    /* 기존 startDate 를 유지한 채 weeksToCalc 만 바뀐 경우의 일정 재계산 */
+    if (!appData.startDate) return;
+    sessionDates = [appData.startDate];
+    skippedHolidayDates = [];
+    if (appData.option !== '원데이 클래스') {
+      var valid = 1, chk = new Date(appData.startDate);
+      while (valid < appData.weeksToCalc) {
+        chk.setDate(chk.getDate() + 7);
+        var cs = fmtDate(chk);
+        if (holidaysList.indexOf(cs) !== -1) skippedHolidayDates.push(cs);
+        else { sessionDates.push(cs); valid++; }
+      }
+      appData.endDate = sessionDates[sessionDates.length - 1];
+      appData.sessionText = shortDate(sessionDates[0]) + ' ~ ' + shortDate(appData.endDate) + ' (총 ' + appData.weeksToCalc + '회)';
+    } else {
+      appData.endDate = appData.startDate;
+      appData.sessionText = shortDate(appData.startDate);
+    }
+    _renderResultDatesBox();
+  }
+
+  function _renderResultDatesBox() {
+    var res = document.getElementById('resultDatesBox');
+    if (!res || !appData.startDate) return;
+    var mainHTML =
+      '<div class="res-main-label">함께할 일정</div>'+
+      '<div class="res-main-val">'+escapeHtml(appData.sessionText)+'</div>';
+    var detailItems = [];
+    if (appData.expDate) {
+      detailItems.push(
+        '<div class="res-sub"><span class="res-sub-label">지금 만료일</span><span class="res-sub-val">'+escapeHtml(shortDate(appData.expDate))+'</span></div>'
+      );
+    }
+    skippedHolidayDates.filter(function(d){return holidayTypes[d]!=='선택';}).forEach(function(d){
+      var r=holidayReasons[d]?holidayReasons[d].replace(/로 인해|으로 인해/g,'').trim():'';
+      detailItems.push(
+        '<div class="res-sub"><span class="res-sub-label">[휴강]</span><span class="res-sub-val">'+shortDate(d)+(r?' · '+escapeHtml(r):'')+' — 이 주는 쉬어갑니다.</span></div>'
+      );
+    });
+    skippedHolidayDates.filter(function(d){return holidayTypes[d]==='선택';}).forEach(function(d){
+      var r=holidayReasons[d]?holidayReasons[d].replace(/로 인해|으로 인해/g,'').trim():'';
+      detailItems.push(
+        '<div class="res-sub"><span class="res-sub-label">[자율]</span><span class="res-sub-val">'+shortDate(d)+(r?' · '+escapeHtml(r):'')+' — 수련 가능</span></div>'
+      );
+    });
+    var detailBlock = '';
+    if (detailItems.length > 0) {
+      detailBlock =
+        '<button class="result-detail-toggle" onclick="toggleResultDetail(this)"><span class="arrow">▾</span> 일정 상세 보기</button>'+
+        '<div class="result-detail">'+ detailItems.join('') +'</div>';
+    }
+    res.innerHTML = mainHTML + detailBlock;
+    res.style.display='block';
+  }
+
+  function selectOption(optName, basePrice, weeks) {
+    var wasOneDay = (appData.option === '원데이 클래스');
+    var willBeOneDay = (optName === '원데이 클래스');
+    var familyChanged = (appData.option && wasOneDay !== willBeOneDay);
+    var weeksChanged = (appData.weeksToCalc !== weeks);
+
+    appData.option = optName;
+    appData.weeksToCalc = weeks;
+
+    if (familyChanged) {
+      /* 원데이 ↔ 기간권 — 유형 자체가 바뀜 → 시작일/일정 초기화 */
+      _resetSchedule();
+      appData.persons = 1;
+    }
+
+    if (willBeOneDay) {
+      appData.amount = (appData.persons || 1) * ONE_DAY_PRICE;
+      var pcEl = document.getElementById('personCount'); if (pcEl) pcEl.innerText = appData.persons || 1;
+      var otEl = document.getElementById('oneDayTotal'); if (otEl) otEl.innerText = appData.amount.toLocaleString()+'원';
+      activateStep('oneday');
+    } else {
+      appData.amount = basePrice;
+      var calEl = document.getElementById('calGrid');
+      if (familyChanged || !calEl || !calEl.children.length) {
+        /* 유형 전환 또는 최초 진입 — 캘린더 환경 재설정 */
+        setupCalendarEnv();
+      } else if (weeksChanged && appData.startDate) {
+        /* 같은 가족 내 주차 변경 — 시작일 유지, 일정만 재계산 */
+        _recomputeScheduleFromStart();
+        renderCalendar();
+      }
+      activateStep('date');
+      var dcb2 = document.getElementById('dateConfirmBtn');
+      if (dcb2) dcb2.disabled = !appData.startDate;
+    }
+  }
+
+  /* 원데이 [확인] — 인원 변경은 같은 날, 같은 가족 → 시작일 보존, 금액만 갱신 */
+  function confirmOneday() {
+    if (appData.persons < 1) appData.persons = 1;
+    appData.amount = appData.persons * ONE_DAY_PRICE;
+    var otEl = document.getElementById('oneDayTotal');
+    if (otEl) otEl.innerText = appData.amount.toLocaleString()+'원';
+    var calEl = document.getElementById('calGrid');
+    if (!calEl || !calEl.children.length) setupCalendarEnv();
+    activateStep('date');
+    var dcb2 = document.getElementById('dateConfirmBtn');
+    if (dcb2) dcb2.disabled = !appData.startDate;
+  }
+
+  function changeCount(c) {
+    appData.persons=Math.max(1,appData.persons+c);
+    appData.amount=appData.persons*ONE_DAY_PRICE;
+    document.getElementById('personCount').innerText=appData.persons;
+    document.getElementById('oneDayTotal').innerText=appData.amount.toLocaleString()+'원';
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     캘린더 (데이터 연산 전체 보존)
+     ══════════════════════════════════════════════════════════ */
+  var _calSheetOpen = false;
+
+  function setupCalendarEnv() {
+    sessionDates=[]; skippedHolidayDates=[];
+    var rdBox = document.getElementById('resultDatesBox');
+    if (rdBox) { rdBox.style.display='none'; rdBox.innerHTML=''; }
+    document.getElementById('noDateMessage').style.display='none';
+    document.getElementById('preHolidayNotice').style.display='none';
+    var today=new Date(); today.setHours(0,0,0,0); minValidDate=new Date(today);
+    if (appData.option!=='원데이 클래스'&&appData.expDate) {
+      var ep=appData.expDate.split('-'); var expObj=new Date(parseInt(ep[0]),parseInt(ep[1])-1,parseInt(ep[2])); expObj.setHours(0,0,0,0);
+      if (expObj>today) minValidDate=new Date(expObj);
+    }
+    maxValidDate=new Date(today); maxValidDate.setDate(maxValidDate.getDate()+28); maxValidDate.setHours(23,59,59,999);
+    totalValidDatesInWindow=0;
+    var chk=new Date(today);
+    while(chk<=maxValidDate) {
+      var ds=fmtDate(chk), isMH=holidaysList.indexOf(ds)!==-1&&holidayTypes[ds]!=='선택';
+      if(chk.getDay()===6&&chk>=minValidDate&&!isMH&&appData.occupiedDates.indexOf(ds)===-1) totalValidDatesInWindow++;
+      chk.setDate(chk.getDate()+1);
+    }
+    var seek=new Date(minValidDate), foundM=false;
+    for(var i=0;i<=60;i++) {
+      if(seek.getDay()===6) {
+        var sd=fmtDate(seek), isMH2=holidaysList.indexOf(sd)!==-1&&holidayTypes[sd]!=='선택';
+        if(!isMH2&&appData.occupiedDates.indexOf(sd)===-1&&seek<=maxValidDate) {
+          currentNavYear=seek.getFullYear(); currentNavMonth=seek.getMonth(); foundM=true; break;
+        }
+      }
+      seek.setDate(seek.getDate()+1);
+    }
+    if(!foundM){var t=new Date();t.setHours(0,0,0,0);currentNavYear=t.getFullYear();currentNavMonth=t.getMonth();}
+    renderCalendar();
+    if(totalValidDatesInWindow===0) document.getElementById('noDateMessage').style.display='block';
+    var preEl=document.getElementById('preHolidayNotice');
+    var mandIn=holidaysList.filter(function(d){
+      if(holidayTypes[d]==='선택') return false;
+      var dO=new Date(d); dO.setHours(0,0,0,0);
+      return dO>=minValidDate&&dO<=maxValidDate;
+    });
+    if(mandIn.length>0){
+      preEl.innerHTML=mandIn.map(function(d){
+        var r=holidayReasons[d]?holidayReasons[d].replace(/로 인해|으로 인해/g,'').trim():'';
+        return '[휴강] <strong>'+escapeHtml(shortDate(d))+'</strong>'+(r?' · '+escapeHtml(r):'')+' — 이 주는 쉬어갑니다.';
+      }).join('<br>');
+      preEl.style.display='block';
+    }
+  }
+
+  /* 인라인 전환 — 모달 함수는 stub */
+  function openCalendarSheet()  { activateStep('date'); }
+  function closeCalendarSheet() { _calSheetOpen = false; }
+
+  function changeMonth(step) {
+    currentNavMonth+=step;
+    if(currentNavMonth>11){currentNavMonth=0;currentNavYear++;}
+    else if(currentNavMonth<0){currentNavMonth=11;currentNavYear--;}
+    renderCalendar();
+  }
+
+  function renderCalendar() {
+    var grid=document.getElementById('calGrid'), html='';
+    var dayNames=['일','월','화','수','목','금','토'];
+    for(var n=0;n<7;n++) html+='<div class="'+(n===6?'cal-day-name sat':'cal-day-name')+'">'+dayNames[n]+'</div>';
+    document.getElementById('calMonthText').innerText=currentNavYear+'. '+String(currentNavMonth+1).padStart(2,'0');
+    var firstDay=new Date(currentNavYear,currentNavMonth,1).getDay(), daysInMonth=new Date(currentNavYear,currentNavMonth+1,0).getDate();
+    var today=new Date(); today.setHours(0,0,0,0);
+    for(var e=0;e<firstDay;e++) html+='<div></div>';
+    for(var i=1;i<=daysInMonth;i++){
+      var ld=new Date(currentNavYear,currentNavMonth,i), ds=fmtDate(ld), cls='cal-date';
+      var isHol=holidaysList.indexOf(ds)!==-1, isOpt=isHol&&holidayTypes[ds]==='선택', isMand=isHol&&!isOpt;
+      var isOcc=appData.occupiedDates.indexOf(ds)!==-1, isExp=appData.expDate&&ds===appData.expDate;
+      var isSkp=skippedHolidayDates.indexOf(ds)!==-1, isOut=ld<minValidDate||ld>maxValidDate||ld.getDay()!==6;
+      if(ld.getTime()===today.getTime()) cls+=' today';
+      if(isExp) cls+=' exp-date';
+      if(isOcc) cls+=' disabled occupied';
+      else if(sessionDates.indexOf(ds)!==-1) cls+=' session-date'+(isOut?' disabled':'');
+      else if(isSkp) cls+=isMand?' skipped-holiday':' disabled';
+      else if(isMand) cls+=' disabled skipped-holiday';
+      else if(isOut) cls+=' disabled';
+      else cls+=' valid-sat';
+      html+='<div class="'+cls+'" onclick="selectDate(\''+ds+'\',this)">'+i+'</div>';
+    }
+    grid.innerHTML=html;
+  }
+
+  function selectDate(dateStr, el) {
+    if (el && (el.classList.contains('disabled') || el.classList.contains('occupied'))) return;
+    appData.startDate = dateStr;
+    /* 시작일·일정·요약박스를 한 곳에서 계산·렌더 (selectOption 의 주차 변경 경로와 동일 동작) */
+    _recomputeScheduleFromStart();
+    renderCalendar();
+    var confirmBtn = document.getElementById('dateConfirmBtn');
+    if (confirmBtn) confirmBtn.disabled = false;
+  }
+
+  /* 시작일 단계 [확인] 버튼 — 메모 단계로 진행 */
+  function confirmDate() {
+    if (!appData.startDate) return;
+    goToMemoSlide();
+  }
+
+  function toggleResultDetail(btn) {
+    btn.classList.toggle('open');
+    var d = btn.nextElementSibling;
+    if (d) d.classList.toggle('open');
+  }
+
+  function goToMemoSlide() {
+    document.getElementById('memoGuideText').innerText = appData.isNew
+      ? '요가는 처음이신가요, 익숙하신가요. 몸에 살피는 부분이 있다면 한 줄 남겨주세요.'
+      : '오늘의 컨디션, 또는 미리 전하고 싶은 말이 있다면 적어주세요.';
+    var onedayEl = _stepEl('oneday');
+    if (onedayEl && onedayEl.classList.contains('revealed') && !onedayEl.classList.contains('completed')) {
+      _updateSummary('oneday');
+      _collapseStep(onedayEl);
+      if (_stepProgress.indexOf('oneday')===-1) _stepProgress.push('oneday');
+    }
+    _preparePolicyUI();
+    activateStep('memo');
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     정책 UI & 제출
+     ══════════════════════════════════════════════════════════ */
+  function _preparePolicyUI() {
+    var optText=appData.option; if(appData.option==='원데이 클래스') optText+=' ('+appData.persons+'명)';
+    var discBadge='';
+    if (appData.onedayApplied && appData.onedayDiscount > 0) {
+      discBadge=' <span style="font-size:10px;color:var(--text-faint);letter-spacing:0.04em;">(-'+appData.onedayDiscount.toLocaleString()+'원)</span>';
+    } else if(optText.indexOf('두 달')!==-1) {
+      discBadge=' <span style="font-size:10px;color:var(--text-faint);letter-spacing:0.04em;">(-10,000원)</span>';
+    } else if(optText.indexOf('세 달')!==-1) {
+      discBadge=' <span style="font-size:10px;color:var(--text-faint);letter-spacing:0.04em;">(-30,000원)</span>';
+    }
+
+    /* 영수증의 Date 라인 — 시작·종료·총 회차 + 휴강/선택휴강 상세 한 줄씩 */
+    var dateValueHTML = escapeHtml(appData.sessionText || '');
+    var mandList = skippedHolidayDates.filter(function(d){return holidayTypes[d] !== '선택';});
+    var optList  = skippedHolidayDates.filter(function(d){return holidayTypes[d] === '선택';});
+    if (mandList.length > 0) {
+      dateValueHTML += '<div class="final-sub">' + mandList.map(function(d){
+        var r = holidayReasons[d] ? holidayReasons[d].replace(/로 인해|으로 인해/g,'').trim() : '';
+        return shortDate(d) + (r ? ' · ' + escapeHtml(r) : '') + ' — 이 주는 쉬어갑니다.';
+      }).join('<br>') + '</div>';
+    }
+    if (optList.length > 0) {
+      dateValueHTML += '<div class="final-sub">' + optList.map(function(d){
+        var r = holidayReasons[d] ? holidayReasons[d].replace(/로 인해|으로 인해/g,'').trim() : '';
+        return shortDate(d) + (r ? ' · ' + escapeHtml(r) : '') + ' — 수련 가능';
+      }).join('<br>') + '</div>';
+    }
+    if (appData.expDate && appData.option !== '원데이 클래스') {
+      dateValueHTML += '<div class="final-sub">지금 만료일 · ' + escapeHtml(shortDate(appData.expDate)) + '</div>';
+    }
+
+    var fHTML=
+      '<div class="final-row"><span class="final-label">Pass</span><strong class="final-value">'+escapeHtml(optText)+'</strong></div>'+
+      '<div class="final-row"><span class="final-label">Date</span><strong class="final-value">'+dateValueHTML+'</strong></div>'+
+      '<div class="final-row"><span class="final-label">Amount</span><strong class="final-value">'+appData.amount.toLocaleString()+'원'+discBadge+'</strong></div>';
+    document.getElementById('receiptContent').innerHTML=fHTML;
+
+    var _weeksForPause = (appData.onedayApplied && appData.originalWeeks) ? appData.originalWeeks : appData.weeksToCalc;
+    var pauseCount=appData.passType==='특정'?1:Math.floor(_weeksForPause/4);
+    /* 겉(체크박스 위 안내) — 감성적·짧게 */
+    var pauseHTML=pauseCount>0?'<p style="font-size:13px;color:var(--text-light);line-height:1.6;margin:16px 0 0;">못 오는 날은 전날까지 알려주시면, 기간 안에서 '+pauseCount+'회까지 쉬어갈 수 있어요.</p>':'';
+
+    /* 서랍 안(상세) — 분쟁 소지 차단을 위해 건조하고 정확하게.
+       기준점(시점)과 계산식을 투명하게 명시. */
+    var refundBlock =
+      (appData.option === '원데이 클래스')
+        ? '<div class="policy-block">'+
+            '<div class="policy-block-title">Refund</div>'+
+            '<div class="policy-block-body">수업 전날 23:59까지 요청 시 전액 환불됩니다.<br>당일 취소 및 일정 변경은 불가합니다.</div>'+
+          '</div>'
+        : '<div class="policy-block">'+
+            '<div class="policy-block-title">Refund</div>'+
+            '<div class="policy-block-body">환불 요청일 이전에 진행된 수업은 출석 여부와 무관하게 횟수에서 차감(회당 30,000원)됩니다.<br>이후 총 결제 금액의 10%를 위약금으로 공제한 남은 잔액을 돌려드립니다.</div>'+
+          '</div>';
+
+    var pauseBlock = (appData.option !== '원데이 클래스' && pauseCount > 0)
+      ? '<div class="policy-block">'+
+          '<div class="policy-block-title">Pause</div>'+
+          '<div class="policy-block-body">수업 전날 23:29까지 알려주시면, 기간 내 최대 '+pauseCount+'회까지 홀딩(쉬어가기)이 가능합니다.<br>(당일 취소 및 무단 불참 시 수업 횟수 차감)</div>'+
+        '</div>'
+      : '';
+
+    var policyHTML =
+      refundBlock +
+      pauseBlock +
+      '<div class="policy-block">'+
+        '<div class="policy-block-title">Records</div>'+
+        '<div class="policy-block-body">남겨주신 흔적은 마지막 수련일로부터<br>1년 뒤 조용히 사라집니다.</div>'+
+      '</div>'+
+      '<div class="policy-block">'+
+        '<div class="policy-block-title">현금영수증</div>'+
+        '<div class="policy-block-body">계좌이체 후 현금영수증이 필요하시면<br>문자로 말씀해 주세요.<br>소득공제용·지출증빙용 모두 발급 가능해요.</div>'+
+      '</div>';
+
+    var amountBlock =
+      '<div class="amount-display">'+
+        '<span class="amount-label">Total</span>'+
+        '<span class="amount-value">'+appData.amount.toLocaleString()+'<span class="won">원</span></span>'+
+      '</div>';
+
+    document.getElementById('dynamicPolicy').innerHTML=
+      amountBlock+
+      pauseHTML+
+      '<div style="margin-top:20px;">'+
+        '<label class="checkbox-wrap" id="agreeWrap">'+
+          '<input type="checkbox" id="agreeCheck" onchange="toggleSubmitBtn()">'+
+          '<span>규정과 기록 보관에 동의해요.'+
+            '<span class="policy-detail-toggle" onclick="event.preventDefault(); togglePolicyDetail();">상세</span>'+
+          '</span>'+
+        '</label>'+
+        '<div id="hiddenPolicy">'+policyHTML+'</div>'+
+      '</div>';
+
+    document.getElementById('displayUserName').innerText=appData.name;
+    var safeName=escapeHtml(appData.name);
+    document.getElementById('depositNotice').innerHTML=(appData.option==='원데이 클래스'&&appData.persons>1)?
+      '대표자 <strong>\''+safeName+'\'</strong> 이름으로 입금해 주세요.<br><span style="opacity:0.7;">(동반 인원 금액 포함)</span>':
+      '<strong>\''+safeName+'\'</strong> 이름으로 입금해 주세요.';
+    document.getElementById('btnSubmit').disabled=true;
+
+    var btnWrap = document.getElementById('submitBtnWrapper');
+    btnWrap.onclick = function() {
+      if(document.getElementById('btnSubmit').disabled) {
+        var wrap = document.getElementById('agreeWrap');
+        wrap.classList.remove('highlight');
+        void wrap.offsetWidth;
+        wrap.classList.add('highlight');
+      }
+    };
+  }
+
+  function togglePolicyDetail() {
+    document.getElementById('hiddenPolicy').classList.toggle('open');
+  }
+
+  function toggleSubmitBtn() {
+    document.getElementById('btnSubmit').disabled=!document.getElementById('agreeCheck').checked;
+  }
+
+  function submitData() {
+    if(document.getElementById('btnSubmit').disabled) return;
+    appData.memo = document.getElementById('userMemo').value.trim();
+    var btn = document.getElementById('btnSubmit');
+    btn.disabled=true; btn.innerText='보내는 중…';
+    var _submitted = false;
+    var _timeout = setTimeout(function() {
+      if (!_submitted) { btn.disabled=false; btn.innerText='신청 완료하기'; showCustomAlert('일시적인 오류가 발생했습니다.\n잠시 후 다시 시도해 주세요.'); }
+    }, 10000);
+    google.script.run
+      .withSuccessHandler(function(ok) {
+        _submitted=true; clearTimeout(_timeout);
+        if(ok){
+          document.getElementById('finalAmountDisplay').innerText=appData.amount.toLocaleString()+'원';
+          isFinalSubmitted=true;
+          saveUserLocal(appData.name,appData.phoneMask,appData.fullPhone);
+          showComplete();
+        }
+        else { showCustomAlert('일시적인 오류가 발생했습니다.\n잠시 후 다시 시도해 주세요.'); btn.disabled=false; btn.innerText='신청 완료하기'; }
+      })
+      .withFailureHandler(function(){
+        _submitted=true; clearTimeout(_timeout);
+        showCustomAlert('일시적인 오류가 발생했습니다.\n잠시 후 다시 시도해 주세요.');
+        btn.disabled=false; btn.innerText='신청 완료하기';
+      })
+      .submitApplication({ isNew:appData.isNew, name:appData.name, fullPhone:appData.fullPhone, phoneMask:appData.phoneMask, option:appData.option, startDate:appData.startDate, endDate:appData.endDate, amount:appData.amount, memo:appData.memo });
+  }
+
+  /* 완료 화면 — 계좌번호 · 예금주 · 결제 금액을 한 번에 복사 (입금자명 제외) */
+  function copyAccountInfo() {
+    var btn = document.getElementById('btnCopy');
+    var amountStr = (appData.amount || 0).toLocaleString() + '원';
+    var text = '국민 904736-56-545\n최승훈\n' + amountStr;
+    var done = function() {
+      btn.innerText = '복사되었어요';
+      setTimeout(function(){ btn.innerText = '계좌 정보 복사'; }, 2500);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(function(){
+        btn.innerText = '국민 904736-56-545 · 최승훈 · ' + amountStr;
+        setTimeout(function(){ btn.innerText = '계좌 정보 복사'; }, 4000);
+      });
+    } else {
+      btn.innerText = '국민 904736-56-545 · 최승훈 · ' + amountStr;
+      setTimeout(function(){ btn.innerText = '계좌 정보 복사'; }, 4000);
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     5월 2일 시간 변경 공지 주입 (MAY2_NOTICE_ACTIVE 기간에만)
+     ══════════════════════════════════════════════════════════ */
+  function _initMay2Notices() {
+    if (!MAY2_NOTICE_ACTIVE) return;
+
+    // 1. 랜딩 About — When 행에 부연 표시
+    var whenEl = document.getElementById('whenMetaVal');
+    if (whenEl) {
+      whenEl.innerHTML =
+        '매주 토요일 10:30<small>70분 수련</small>' +
+        '<div class="may2-notice-bar" style="margin-top:10px;">5월 2일(토)은 예외적으로 <strong>11:00</strong> 시작이에요.</div>';
+    }
+
+    // 2. 신청폼 상단 배너
+    var bookBar = document.getElementById('may2BookingBar');
+    if (bookBar) bookBar.innerHTML = MAY2_NOTICE_HTML;
+
+    // 3. 완료 화면 배너
+    var compBar = document.getElementById('may2CompleteBar');
+    if (compBar) compBar.innerHTML = MAY2_NOTICE_HTML;
+  }
+
+  function resetApp() {
+    isFinalSubmitted = false; _stepProgress = []; _activeStepId = 'name'; _sheetHistoryPushed = false;
+    appData = {name:'',phoneMask:'',fullPhone:'',isNew:false,passType:'정규',option:'',amount:0,persons:1,startDate:'',endDate:'',weeksToCalc:0,memo:'',sessionText:'',occupiedDates:[],specialOldRule:false,expDate:'',onedayDiscount:0,onedayApplied:false,originalWeeks:0};
+    document.getElementById('userName').value = '';
+    document.getElementById('userPhone').value = '';
+    document.getElementById('searchResultBox').innerHTML = '';
+    document.getElementById('userMemo').value = '';
+    document.getElementById('receiptModalBackdrop').classList.remove('show');
+    document.getElementById('receiptModalSheet').classList.remove('show');
+    _passSheetOpen=false; _calSheetOpen=false;
+    unlockBodyScroll();
+    var noticeEl = document.getElementById('receiptNotice'); if (noticeEl) noticeEl.style.display = 'none';
+    var nameEl = _stepEl('name');
+    nameEl.classList.remove('completed');
+    nameEl.classList.add('revealed');
+    document.getElementById('dynamicPolicy').innerHTML = '';
+    ['phone','pass','oneday','date','memo'].forEach(function(sid) {
+      var el = _stepEl(sid);
+      if (el) { el.classList.remove('revealed','completed','active'); el.style.order = ''; }
+    });
+    _relayoutSteps();
+    var rdBox = document.getElementById('resultDatesBox');
+    if (rdBox) { rdBox.style.display='none'; rdBox.innerHTML=''; }
+    var passOptBox = document.getElementById('passOptionsBox');
+    if (passOptBox) passOptBox.innerHTML = '';
+    var calEl = document.getElementById('calGrid');
+    if (calEl) calEl.innerHTML = '';
+    var dateConfirm = document.getElementById('dateConfirmBtn');
+    if (dateConfirm) dateConfirm.disabled = true;
+    document.getElementById('sec-complete').style.display = 'none';
+    document.getElementById('sec-complete').classList.remove('visible');
+    document.body.classList.remove('form-active','complete-active');
+    closeBookingSheet();
+    document.getElementById('slide1Title').innerHTML = '이름';
+    var rbEl = document.getElementById('returnBanner'); if (rbEl) rbEl.classList.remove('visible','hiding');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+</script>
+</body>
+</html>
