@@ -19,11 +19,16 @@
 // ──────────────────────────────────────────────
 // 1. 전역 상수
 // ──────────────────────────────────────────────
-var SS_ID        = '1Z2Y0DV00CSFwe1RlVBVfsMYSCr03xrC03kdYFUNMTpE';
+// SS_ID, ADMIN_PIN 은 GAS 스크립트 속성에서 읽습니다.
+// 설정: GAS 편집기 → 프로젝트 설정 → 스크립트 속성 탭
+//   속성 이름  SS_ID    → 값: 스프레드시트 ID
+//   속성 이름  ADMIN_PIN → 값: 관리자 PIN
+var _scriptProps_ = PropertiesService.getScriptProperties();
+var SS_ID        = _scriptProps_.getProperty('SS_ID');
 var SHEET_DB_NEW = '통합 수강 DB (신규)';
 var SHEET_LOG    = '결제 및 신청 로그 (신규)';
 var SHEET_HOLIDAY= '휴강 캘린더 (신규)';
-var ADMIN_PIN    = '03290510';
+var ADMIN_PIN    = _scriptProps_.getProperty('ADMIN_PIN');
 
 var REGEX_DATE_SEP = new RegExp('[./]', 'g');
 var REGEX_DATE_8   = new RegExp('^\\d{8}$');
