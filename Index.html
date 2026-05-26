@@ -1800,6 +1800,24 @@
     sessionText:'', occupiedDates:[], specialOldRule:false, expDate:''
   };
   var holidaysList=[], holidayReasons={}, holidayTypes={}, memberDB=[];
+
+  /* ── GAS API 호출 헬퍼 (GitHub Pages 배포용) ──────────────────
+     google.script.run 대신 fetch()로 GAS 백엔드를 직접 호출합니다.
+     사용법: callGAS('함수명', [arg1, arg2]).then(결과).catch(오류)
+  ─────────────────────────────────────────────────────────────── */
+  var GAS_API = 'https://script.google.com/macros/s/AKfycbz0BHY0bHITura9zgHfW8VCZrFYZR624Ydsjs1MeBlHuOsfJKGtWcfGZXab6UrGT9CD/exec';
+  function callGAS(fn, args) {
+    var url = GAS_API + '?fn=' + encodeURIComponent(fn) + '&_t=' + Date.now();
+    if (args !== undefined && args !== null) {
+      url += '&data=' + encodeURIComponent(JSON.stringify(args));
+    }
+    return fetch(url)
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (!d.ok) throw new Error(d.error || '서버 오류');
+        return d.result;
+      });
+  }
   var sessionDates=[], skippedHolidayDates=[];
   var currentNavYear, currentNavMonth;
   var minValidDate, maxValidDate, totalValidDatesInWindow=0;
@@ -2245,8 +2263,8 @@
   function dismissReturn() { dismissReturnHero(); }
 
   window.onload = function() {
-    google.script.run
-      .withSuccessHandler(function(data) {
+    callGAS('getInitialData')
+      .then(function(data) {
         holidaysList=data.holidays||[]; holidayReasons=data.holidayReasons||{};
         holidayTypes=data.holidayTypes||{}; memberDB=data.members||[];
         dataLoaded=true;
@@ -2254,8 +2272,7 @@
         /* 데이터 로드 완료 — 그제야 CTA 등장 */
         document.body.classList.add('data-loaded');
       })
-      .withFailureHandler(function() { showCustomAlert('일시적인 오류가 발생했습니다.\n잠시 후 다시 시도해 주세요.'); })
-      .getInitialData();
+      .catch(function() { showCustomAlert('일시적인 오류가 발생했습니다.\n잠시 후 다시 시도해 주세요.'); });
   };
 
   window.addEventListener('beforeunload', function(e) {
@@ -2293,8 +2310,8 @@
           /* 충돌 경우엔 서버가 last-4 를 클라이언트에 보내지 않음 — 서버에서 검증 */
           _verifyInFlight = true;
           self.disabled = true;
-          google.script.run
-            .withSuccessHandler(function(verified) {
+          callGAS('verifyCollisionMember', [nameInput, val])
+            .then(function(verified) {
               _verifyInFlight = false;
               self.disabled = false;
               if (verified) {
@@ -2306,12 +2323,11 @@
                 self.focus({ preventScroll: true });
               }
             })
-            .withFailureHandler(function() {
+            .catch(function() {
               _verifyInFlight = false;
               self.disabled = false;
               showCustomAlert('일시적인 오류가 발생했습니다.\n잠시 후 다시 시도해 주세요.');
-            })
-            .verifyCollisionMember(nameInput, val);
+            });
         }
       });
       box.appendChild(inp);
@@ -2958,8 +2974,8 @@
     var _timeout = setTimeout(function() {
       if (!_submitted) { btn.disabled=false; btn.innerText='신청 완료하기'; showCustomAlert('일시적인 오류가 발생했습니다.\n잠시 후 다시 시도해 주세요.'); }
     }, 10000);
-    google.script.run
-      .withSuccessHandler(function(ok) {
+    callGAS('submitApplication', [{ isNew:appData.isNew, name:appData.name, fullPhone:appData.fullPhone, phoneMask:appData.phoneMask, option:appData.option, startDate:appData.startDate, endDate:appData.endDate, amount:appData.amount, memo:appData.memo }])
+      .then(function(ok) {
         _submitted=true; clearTimeout(_timeout);
         if(ok){
           document.getElementById('finalAmountDisplay').innerText=appData.amount.toLocaleString()+'원';
@@ -2969,12 +2985,11 @@
         }
         else { showCustomAlert('일시적인 오류가 발생했습니다.\n잠시 후 다시 시도해 주세요.'); btn.disabled=false; btn.innerText='신청 완료하기'; }
       })
-      .withFailureHandler(function(){
+      .catch(function(){
         _submitted=true; clearTimeout(_timeout);
         showCustomAlert('일시적인 오류가 발생했습니다.\n잠시 후 다시 시도해 주세요.');
         btn.disabled=false; btn.innerText='신청 완료하기';
-      })
-      .submitApplication({ isNew:appData.isNew, name:appData.name, fullPhone:appData.fullPhone, phoneMask:appData.phoneMask, option:appData.option, startDate:appData.startDate, endDate:appData.endDate, amount:appData.amount, memo:appData.memo });
+      });
   }
 
   /* 완료 화면 — 계좌번호 · 예금주 · 결제 금액을 한 번에 복사 (입금자명 제외) */

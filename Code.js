@@ -613,10 +613,39 @@ function setupSpreadsheetUI() {
 // 14. 기본 라우터 및 유틸
 // ──────────────────────────────────────────────
 function doGet(e) {
+  // ── API 모드: fn 파라미터가 있으면 JSON 응답 (GitHub Pages → GAS 직접 호출) ──
+  if (e.parameter && e.parameter.fn) {
+    return _handleApiGet_(e);
+  }
+  // ── HTML 모드: 기존 방식 (GAS URL 직접 접속 시) ──
   var template = e.parameter.page === 'admin' ? 'Admin' : 'Index';
   return HtmlService.createTemplateFromFile(template).evaluate()
     .setTitle('루트빈야사')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+/* GitHub Pages에서 fetch()로 호출하는 API 라우터 */
+function _handleApiGet_(e) {
+  try {
+    var fn = e.parameter.fn;
+    var dataParam = e.parameter.data;
+    var args = dataParam ? JSON.parse(dataParam) : [];
+    var result;
+
+    if      (fn === 'getInitialData')        { result = getInitialData(); }
+    else if (fn === 'verifyCollisionMember') { result = verifyCollisionMember(args[0], args[1]); }
+    else if (fn === 'submitApplication')     { result = submitApplication(args[0]); }
+    else { throw new Error('알 수 없는 함수: ' + fn); }
+
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: true, result: result }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (ex) {
+    Logger.log('[_handleApiGet_] ' + ex);
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: false, error: String(ex) }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
 }
 
 function include(filename) { return HtmlService.createHtmlOutputFromFile(filename).getContent(); }
