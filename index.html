@@ -2262,18 +2262,27 @@
   /* 구버전 호환용 stub — 외부 호출처는 더 이상 없음 */
   function dismissReturn() { dismissReturnHero(); }
 
-  window.onload = function() {
+  function _loadInitialData() {
     callGAS('getInitialData')
       .then(function(data) {
         holidaysList=data.holidays||[]; holidayReasons=data.holidayReasons||{};
         holidayTypes=data.holidayTypes||{}; memberDB=data.members||[];
         dataLoaded=true;
         checkReturningUser();
-        /* 데이터 로드 완료 — 그제야 CTA 등장 */
+        /* 데이터 로드 완료 — CTA 등장, 폴러가 살아있으면 정리 */
         document.body.classList.add('data-loaded');
+        if (_dataLoadPoller) { clearInterval(_dataLoadPoller); _dataLoadPoller=null; }
+        var t = document.getElementById('slide1Title');
+        if (t) t.innerHTML = '이름';
       })
-      .catch(function() { showCustomAlert('일시적인 오류가 발생했습니다.\n잠시 후 다시 시도해 주세요.'); });
-  };
+      .catch(function() {
+        /* 실패해도 CTA 는 보여줘서 재시도 진입로 확보, 5초 후 자동 재시도 */
+        document.body.classList.add('data-loaded');
+        showCustomAlert('데이터를 불러오지 못했습니다.\n잠시 후 자동으로 재시도합니다.');
+        setTimeout(_loadInitialData, 5000);
+      });
+  }
+  window.onload = function() { _loadInitialData(); };
 
   window.addEventListener('beforeunload', function(e) {
     if (!isFinalSubmitted && _bookingSheetOpen && _activeStepId !== 'name') { e.preventDefault(); e.returnValue=''; }
@@ -2303,15 +2312,18 @@
       box.appendChild(note);
       var inp=document.createElement('input'); inp.type='tel'; inp.maxLength=4; inp.placeholder='번호 끝 네 자리'; inp.className='collision-input';
       var _verifyInFlight = false;
+      var _verifyToken = 0; /* DOM 교체 후 구 Promise가 반영되지 않도록 세대 번호 관리 */
       inp.addEventListener('input', function() {
         var self = this;
         var val = this.value.replace(/[^0-9]/g,''); this.value = val;
         if (val.length === 4 && !_verifyInFlight) {
           /* 충돌 경우엔 서버가 last-4 를 클라이언트에 보내지 않음 — 서버에서 검증 */
           _verifyInFlight = true;
+          var myToken = ++_verifyToken;
           self.disabled = true;
           callGAS('verifyCollisionMember', [nameInput, val])
             .then(function(verified) {
+              if (myToken !== _verifyToken) return; /* 구 요청 — 무시 */
               _verifyInFlight = false;
               self.disabled = false;
               if (verified) {
@@ -2324,6 +2336,7 @@
               }
             })
             .catch(function() {
+              if (myToken !== _verifyToken) return; /* 구 요청 — 무시 */
               _verifyInFlight = false;
               self.disabled = false;
               showCustomAlert('일시적인 오류가 발생했습니다.\n잠시 후 다시 시도해 주세요.');
@@ -2465,7 +2478,8 @@
       if (val.slice(0,3)!=='010') { errEl.style.display='block'; if (confirmBtn) confirmBtn.disabled=true; return; }
       errEl.style.display='none';
       if (confirmBtn) confirmBtn.disabled=false;
-      setTimeout(saveNewPhone, 750);
+      if (window._phoneAutoTimer) clearTimeout(window._phoneAutoTimer);
+      window._phoneAutoTimer = setTimeout(function(){ window._phoneAutoTimer=null; saveNewPhone(); }, 750);
     } else {
       errEl.style.display='none';
       if (confirmBtn) confirmBtn.disabled = !isValid;
@@ -2973,7 +2987,7 @@
     btn.disabled=true; btn.innerText='보내는 중…';
     var _submitted = false;
     var _timeout = setTimeout(function() {
-      if (!_submitted) { btn.disabled=false; btn.innerText='신청 완료하기'; showCustomAlert('일시적인 오류가 발생했습니다.\n잠시 후 다시 시도해 주세요.'); }
+      if (!_submitted) { _submitted=true; btn.disabled=false; btn.innerText='신청 완료하기'; showCustomAlert('일시적인 오류가 발생했습니다.\n잠시 후 다시 시도해 주세요.'); }
     }, 10000);
     callGAS('submitApplication', [{ isNew:appData.isNew, name:appData.name, fullPhone:appData.fullPhone, phoneMask:appData.phoneMask, option:appData.option, startDate:appData.startDate, endDate:appData.endDate, amount:appData.amount, memo:appData.memo }])
       .then(function(ok) {
