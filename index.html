@@ -2352,6 +2352,7 @@
 
   document.getElementById('userName').addEventListener('keydown', function(e) {
     if (e.key !== 'Enter' && e.keyCode !== 13) return;
+    if (e.isComposing || e.keyCode === 229) return; /* 한국어 IME 조합 중 — 무시 */
     e.preventDefault();
     var v = this.value.trim();
     var matched = dataLoaded && v.length >= 1 && memberDB.some(function(m){ return m.name === v; });
