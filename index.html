@@ -528,6 +528,12 @@
         opacity 0.4s ease-out,
         margin-bottom 0.5s cubic-bezier(0.16, 1, 0.3, 1);
     }
+    /* 새 섹션 진입: 높이 애니 생략, opacity만 페이드인 */
+    .bk-step.entering {
+      transition:
+        opacity 0.44s cubic-bezier(0.4, 0, 0.2, 1),
+        margin-bottom 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+    }
     .bk-step.revealed,
     .bk-step.active {
       grid-template-rows: 1fr;
@@ -540,10 +546,12 @@
     /* Grid 자식 wrapper — overflow:hidden + min-height:0 이 트릭의 핵심 */
     .bk-step-inner { min-height: 0; overflow: hidden; }
 
-    .bk-active-body { display: block; padding-bottom: 4px; }
+    .bk-active-body { display: block; padding-bottom: 4px; transition: opacity 0.16s ease; }
+    .bk-step.step-collapsing .bk-active-body { opacity: 0; pointer-events: none; }
     .bk-summary { display: none; }
 
     .bk-step.completed .bk-active-body { display: none; }
+    @keyframes bk-sum-in { from { opacity: 0; } to { opacity: 1; } }
     .bk-step.completed .bk-summary {
       display: flex;
       align-items: baseline;
@@ -552,6 +560,7 @@
       gap: 16px;
       cursor: pointer;
       transition: opacity 0.25s ease;
+      animation: bk-sum-in 0.3s ease;
     }
     .bk-step.completed .bk-summary:active { opacity: 0.55; }
 
@@ -1939,25 +1948,33 @@
   function _revealStep(el) {
     if (!el) return;
     var wasCompleted = el.classList.contains('completed');
-    el.classList.remove('completed', 'locked');
+    el.classList.remove('completed', 'locked', 'step-collapsing');
     if (wasCompleted) {
+      /* 편집 복귀: .revealed 유지(높이 이미 확보), 내용만 다시 펼치며 페이드인 */
       el.classList.remove('revealed');
-      /* 강제 reflow — 브라우저가 0fr 상태를 인식하도록 */
       void el.offsetWidth;
       requestAnimationFrame(function() {
         requestAnimationFrame(function() { el.classList.add('revealed'); });
       });
     } else {
+      /* 새 섹션 진입: .entering 으로 높이 전환 스킵 → opacity만 페이드인 */
+      el.classList.add('entering');
+      void el.offsetWidth;
       el.classList.add('revealed');
+      setTimeout(function() { el.classList.remove('entering'); }, 600);
     }
   }
 
   /* 한 문항을 요약(완료) 상태로 접는다.
-     .completed 가 body 를 display:none 으로 만들면, Grid 가 콘텐츠 높이(요약 ~48px)에 맞춰 자동 수축. */
+     내용을 먼저 fade-out 한 뒤 .completed 를 적용해 그리드가 요약 높이로 부드럽게 수축. */
   function _collapseStep(el) {
-    if (!el) return;
-    el.classList.add('completed');
-    el.classList.add('revealed');
+    if (!el || el.classList.contains('completed')) return;
+    el.classList.add('step-collapsing');
+    setTimeout(function() {
+      if (!el.classList.contains('step-collapsing')) return;
+      el.classList.remove('step-collapsing');
+      el.classList.add('completed', 'revealed');
+    }, 170);
   }
 
   function _updateSummary(sid) {
@@ -2409,8 +2426,16 @@
       appData.fullPhone = '';
       appData.option = ''; appData.amount = 0; appData.weeksToCalc = 0; appData.persons = 1;
       appData.onedayApplied = false; appData.originalWeeks = 0;
-      appData.startDate = ''; appData.endDate = ''; appData.sessionText = '';
+      appData.startDate = ''; appData.endDate = ''; appData.sessionText = ''; appData.memo = '';
       sessionDates = []; skippedHolidayDates = [];
+      var phEl = document.getElementById('userPhone'); if (phEl) phEl.value = '';
+      var phErr = document.getElementById('phoneError'); if (phErr) phErr.style.display = 'none';
+      var pcb2 = document.getElementById('phoneConfirmBtn'); if (pcb2) pcb2.disabled = true;
+      var pob = document.getElementById('passOptionsBox'); if (pob) pob.innerHTML = '';
+      var rdb = document.getElementById('resultDatesBox'); if (rdb) { rdb.style.display='none'; rdb.innerHTML=''; }
+      var calEl = document.getElementById('calGrid'); if (calEl) calEl.innerHTML = '';
+      var dcb2 = document.getElementById('dateConfirmBtn'); if (dcb2) dcb2.disabled = true;
+      var memoEl = document.getElementById('userMemo'); if (memoEl) memoEl.value = '';
       ['phone','pass','oneday','date','memo'].forEach(function(sid) {
         var el = _stepEl(sid);
         if (el) { el.classList.remove('revealed','completed','active'); }
