@@ -1797,7 +1797,7 @@
     passType:'정규', option:'', amount:0, persons:1,
     startDate:'', endDate:'', weeksToCalc:0, memo:'',
     onedayDiscount:0, onedayApplied:false, originalWeeks:0,
-    sessionText:'', occupiedDates:[], specialOldRule:false, expDate:''
+    sessionText:'', occupiedDates:[], expDate:''
   };
   var holidaysList=[], holidayReasons={}, holidayTypes={}, memberDB=[];
 
@@ -2400,7 +2400,7 @@
     var memberChanged = (appData.name !== m.name) || (appData.phoneMask !== m.phoneMask);
     appData.occupiedDates = m.occupiedDates || [];
     appData.name = m.name; appData.phoneMask = m.phoneMask;
-    appData.isNew = false; appData.expDate = m.expDate || ''; appData.specialOldRule = m.specialOldRule || false;
+    appData.isNew = false; appData.expDate = m.expDate || '';
     appData.onedayDiscount = m.onedayDiscount || 0;  // 원데이 할인 금액 (0=없음)
     if (m.type === '특정') appData.passType = '특정';
     else if (m.isEligible) appData.passType = '연장';
@@ -2439,7 +2439,7 @@
     /* 이름이 *바뀐* 경우엔 이후 단계 데이터(연락처·옵션·날짜·메모) cascading 리셋 */
     var nameChanged = (appData.name !== rawName) || !appData.isNew;
     appData.name=rawName;
-    appData.isNew=true; appData.passType='정규'; appData.phoneMask=''; appData.occupiedDates=[]; appData.expDate=''; appData.specialOldRule=false;
+    appData.isNew=true; appData.passType='정규'; appData.phoneMask=''; appData.occupiedDates=[]; appData.expDate='';
     if (nameChanged) {
       appData.fullPhone='';
       appData.option=''; appData.amount=0; appData.weeksToCalc=0; appData.persons=1;
@@ -2537,9 +2537,21 @@
     var odS = od > 0 ? od.toLocaleString() : '';
 
     if (appData.passType==='특정') {
-      // 특정 패스 — 원데이 할인 미적용
-      var wks=appData.specialOldRule?5:4;
-      box.innerHTML='<p class="pass-section-label">특별 패스</p><button class="btn-option" onclick="selectOption(\'특별 패스 ('+wks+'회)\',100000,'+wks+')"><div><div class="opt-title">특별 패스 ('+wks+'회)</div></div><div class="opt-price">100,000원</div></button>';
+      // 특정 패스 — 1·2·3개월 옵션, 원데이 할인 미적용
+      box.innerHTML=
+        '<p class="pass-section-label">특별 패스</p>'+
+        '<button class="btn-option" onclick="selectOption(\'특별 패스 한 달 (4회)\',100000,4)">'+
+          '<div><div class="opt-title">한 달 (4회)</div></div>'+
+          '<div class="opt-price">100,000원</div></button>'+
+        '<button class="pass-more-toggle" onclick="togglePassMore(this)"><span>＋ 다른 기간 더보기</span><span>＋</span></button>'+
+        '<div class="pass-more-section">'+
+          '<button class="btn-option" onclick="selectOption(\'특별 패스 두 달 (8회)\',190000,8)">'+
+            '<div><div class="opt-title">두 달 (8회)</div></div>'+
+            '<div class="opt-price">190,000원<span class="discount-badge">-10,000원</span></div></button>'+
+          '<button class="btn-option" onclick="selectOption(\'특별 패스 세 달 (12회)\',270000,12)">'+
+            '<div><div class="opt-title">세 달 (12회)</div></div>'+
+            '<div class="opt-price">270,000원<span class="discount-badge">-30,000원</span></div></button>'+
+        '</div>';
 
     } else if (appData.passType==='연장' && od > 0) {
       // 연장 + 원데이 할인 동시 적용
@@ -3060,7 +3072,7 @@
 
   function resetApp() {
     isFinalSubmitted = false; _stepProgress = []; _activeStepId = 'name'; _sheetHistoryPushed = false;
-    appData = {name:'',phoneMask:'',fullPhone:'',isNew:false,passType:'정규',option:'',amount:0,persons:1,startDate:'',endDate:'',weeksToCalc:0,memo:'',sessionText:'',occupiedDates:[],specialOldRule:false,expDate:'',onedayDiscount:0,onedayApplied:false,originalWeeks:0};
+    appData = {name:'',phoneMask:'',fullPhone:'',isNew:false,passType:'정규',option:'',amount:0,persons:1,startDate:'',endDate:'',weeksToCalc:0,memo:'',sessionText:'',occupiedDates:[],expDate:'',onedayDiscount:0,onedayApplied:false,originalWeeks:0};
     document.getElementById('userName').value = '';
     document.getElementById('userPhone').value = '';
     document.getElementById('searchResultBox').innerHTML = '';

@@ -100,15 +100,10 @@ function getOriginalStartDate(datesG, datesH) {
 
 // ──────────────────────────────────────────────
 // 4. "특정" 회원 쉬어가기 한도 계산 헬퍼
-//    ✅ [수정] 5월까지 = totalWeeks÷5, 6월부터 = totalWeeks÷4
+//    6월부터 4회 = 1개월 기준 통일
 // ──────────────────────────────────────────────
 function calcMaxPauses(type, totalWeeks) {
-  if (type !== '특정') return Math.floor(totalWeeks / 4);
-  var today = new Date(); today.setHours(0, 0, 0, 0);
-  // 5월까지는 5회가 1개월이므로 쉬어가기도 totalWeeks÷5
-  return today < new Date(2026, 5, 1)
-    ? Math.floor(totalWeeks / 5)
-    : Math.floor(totalWeeks / 4);
+  return Math.floor(totalWeeks / 4);
 }
 
 
@@ -438,10 +433,10 @@ function confirmPaymentAdmin(rowIdx) {
     var amount = Number(row[5]) || 0;
     var startDateStr = String(row[4]).split('~')[0].trim();
 
-    // ✅ 5회(특정 구권) 포함하여 주수 계산
+    // 특정 회원 다회차(8회·12회) 및 구권(5회) 포함 주수 계산
     var weeks = 4;
-    if (option.indexOf('12주') >= 0) weeks = 12;
-    else if (option.indexOf('8주') >= 0) weeks = 8;
+    if (option.indexOf('12주') >= 0 || option.indexOf('12회') >= 0) weeks = 12;
+    else if (option.indexOf('8주') >= 0 || option.indexOf('8회') >= 0) weeks = 8;
     else if (option.indexOf('5회') >= 0 || option.indexOf('5주') >= 0) weeks = 5;
     else if (option.indexOf('원데이') >= 0) weeks = 1;
 
@@ -1046,7 +1041,6 @@ function getInitialData() {
         if (classify === '특정' && status === '만료' && diffDays > 14) classify = '정규';
       }
 
-      var specialOldRule = (classify === '특정') ? (today < new Date(2026, 5, 1)) : false;
       var uniqueKey = name + '_' + phone;
 
       // 새 회원 등록 또는 기존 회원 데이터 최신화 (병합)
@@ -1058,7 +1052,6 @@ function getInitialData() {
           expDate: expDateStr,
           status: status,
           isEligible: isEligible,
-          specialOldRule: specialOldRule,
           occupiedDates: datesG.slice()
         };
       } else {
@@ -1069,7 +1062,6 @@ function getInitialData() {
         if (isEligible) existing.isEligible = true;
         if (expDateStr > existing.expDate) existing.expDate = expDateStr;
         if (classify === '특정') existing.type = '특정';
-        if (specialOldRule) existing.specialOldRule = true;
       }
     }
 
@@ -1144,7 +1136,6 @@ function getInitialData() {
         type: m.type,
         expDate: m.expDate,
         isEligible: m.isEligible,
-        specialOldRule: m.specialOldRule,
         occupiedDates: m.occupiedDates,
         onedayDiscount: odInfo ? odInfo.price : 0  // 1인당 원데이 할인 금액 (0=없음)
       });
@@ -1203,13 +1194,11 @@ function verifyCollisionMember(name, last4) {
         if (status === '수강중' || status === '수강예정' || (status === '만료' && diffDays <= 14)) isEligible = true;
         if (classify === '특정' && status === '만료' && diffDays > 14) classify = '정규';
       }
-      var specialOldRule = (classify === '특정') ? (today < new Date(2026, 5, 1)) : false;
-
       var uniqueKey = rName + '_' + rPhone;
       if (!found[uniqueKey]) {
         found[uniqueKey] = {
           name: rName, phone: rPhone, type: classify, expDate: expDateStr,
-          status: status, isEligible: isEligible, specialOldRule: specialOldRule,
+          status: status, isEligible: isEligible,
           occupiedDates: datesG.slice()
         };
       } else {
@@ -1218,7 +1207,6 @@ function verifyCollisionMember(name, last4) {
         if (isEligible) e.isEligible = true;
         if (expDateStr > e.expDate) e.expDate = expDateStr;
         if (classify === '특정') e.type = '특정';
-        if (specialOldRule) e.specialOldRule = true;
       }
     }
 
@@ -1237,7 +1225,6 @@ function verifyCollisionMember(name, last4) {
       type: m.type,
       expDate: m.expDate,
       isEligible: m.isEligible,
-      specialOldRule: m.specialOldRule,
       occupiedDates: m.occupiedDates
     };
   } catch(ex) {
@@ -1815,8 +1802,8 @@ function sendPaymentConfirmedSMS(name, phone, option, schedule, memo) {
     } else {
       // ── 정규 / 연장 / 특정 ──
       var weeks = 4;
-      if (option.indexOf('12주') >= 0) weeks = 12;
-      else if (option.indexOf('8주') >= 0) weeks = 8;
+      if (option.indexOf('12주') >= 0 || option.indexOf('12회') >= 0) weeks = 12;
+      else if (option.indexOf('8주') >= 0 || option.indexOf('8회') >= 0) weeks = 8;
       else if (option.indexOf('5회') >= 0 || option.indexOf('5주') >= 0) weeks = 5;
 
       var isExtension = option.indexOf('연장') >= 0;
