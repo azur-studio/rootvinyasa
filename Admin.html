@@ -763,9 +763,13 @@
         google.script.run
           .withSuccessHandler(function(res) {
             if (res) { cache.pending = false; cache.members = false; cache.dashboard = false; checkPendingBadgeSilently(); }
-            else { cardElem.style.display = 'block'; cardElem.style.opacity = '1'; showCustomAlert('승인 처리 중 오류가 발생했습니다.'); }
+            else { cardElem.style.display = 'block'; cardElem.style.opacity = '1'; showCustomAlert('승인 처리 중 오류가 발생했습니다.\n(이미 처리됐거나 DB 저장 실패)'); }
           })
-          .confirmPaymentAdmin(rowIdx);
+          .withFailureHandler(function(err) {
+            cardElem.style.display = 'block'; cardElem.style.opacity = '1';
+            showCustomAlert('서버 통신 오류: ' + (err && err.message ? err.message : err));
+          })
+          .confirmPaymentAdminWithSMS(rowIdx);
       }
     });
   }

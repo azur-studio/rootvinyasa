@@ -482,6 +482,31 @@ var targetDBRange = dbSheet.getRange(2, 1, 1, 9);
 
 
 // ──────────────────────────────────────────────
+// 11-W. 관리자 결제확인 + SMS 래퍼 (Admin.html 전용)
+//   confirmPaymentAdmin 성공 시 SMS까지 발송
+// ──────────────────────────────────────────────
+function confirmPaymentAdminWithSMS(rowIdx) {
+  try {
+    var confirmed = confirmPaymentAdmin(rowIdx);
+    if (!confirmed) return false;
+    var ss = SpreadsheetApp.openById(SS_ID);
+    var row = ss.getSheetByName(SHEET_LOG).getRange(rowIdx, 1, 1, 9).getValues()[0];
+    sendPaymentConfirmedSMS(
+      String(row[1]),
+      String(row[2]).replace(/[^0-9]/g, ''),
+      String(row[3]),
+      String(row[4]),
+      String(row[6])
+    );
+    return true;
+  } catch(ex) {
+    Logger.log('[confirmPaymentAdminWithSMS] ' + ex);
+    return false;
+  }
+}
+
+
+// ──────────────────────────────────────────────
 // 11-A. 원데이 할인 조회 헬퍼
 //   최근 14일 이내 확정된 원데이 결제 기록 반환
 //   1인당 가격(logAmount ÷ 인원)을 반환해 35,000원 하드코딩 방지
@@ -1853,11 +1878,14 @@ function doPost(e) {
     // 3. 입금 정보 추출 (전자금융입금 기준)
     var depositor = '';
     var amount = 0;
-    var matchData = fullData.match(/([가-힣A-Za-z]{2,10})\s+전자금융입금\s+([\d,]+)/);
+    // 1순위: "이름 전자금융입금 금액" 패턴 (이름 1~20자, 공백 허용)
+    var matchData = fullData.match(/([가-힣A-Za-z\s]{1,20}?)\s*전자금융입금\s+([\d,]+)/);
+    // 2순위: "이름 입금 금액" 패턴 (타행이체 등 대체 표현)
+    if (!matchData) matchData = fullData.match(/([가-힣A-Za-z\s]{1,20}?)\s*입금\s+([\d,]+)/);
 
     if (matchData) {
-      depositor = matchData[1].trim(); 
-      amount = Number(matchData[2].replace(/,/g, '')); 
+      depositor = matchData[1].replace(/\s+/g, '').trim();
+      amount = Number(matchData[2].replace(/,/g, ''));
     }
 
     // [이 아래부터는 기존의 '파싱 실패 처리' 및 '매칭 로직'을 그대로 사용하세요]
@@ -1907,8 +1935,18 @@ function doPost(e) {
 
     // 매칭 성공
     if (matched) {
-      confirmPaymentAdmin(matched.rowIdx);
-sendPaymentConfirmedSMS(matched.name, matched.phone, matched.option, matched.schedule, matched.memo);
+      var confirmed = confirmPaymentAdmin(matched.rowIdx);
+      if (!confirmed) {
+        var ipPhone = PropertiesService.getScriptProperties().getProperty('INSTRUCTOR_PHONE');
+        if (ipPhone) {
+          enqueueSMS(ipPhone, '최승훈',
+            '[ROOT 확인 실패]\n입금자: ' + depositor + '\n금액: ' + amount.toLocaleString() + '원\n' +
+            '이름 매칭은 됐으나 DB 저장 실패.\n대시보드에서 수동 처리 필요.',
+            '시스템알림', SMS_STATUS.IMMEDIATE);
+        }
+        return ContentService.createTextOutput('CONFIRM_FAIL');
+      }
+      sendPaymentConfirmedSMS(matched.name, matched.phone, matched.option, matched.schedule, matched.memo);
       return ContentService.createTextOutput('OK');
     }
 
