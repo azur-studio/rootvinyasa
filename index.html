@@ -511,7 +511,7 @@
       font-weight: 500;
       order: -2;            /* 항상 최상단 */
     }
-    #may2BookingBar { order: -1; }   /* 라벨 바로 아래, 활성 문항 위 */
+
 
     /* ── Cascading Step ── */
     /* CSS Grid 0fr↔1fr 트릭으로 콘텐츠 높이를 브라우저가 자체 보간.
@@ -1486,34 +1486,6 @@
     }
     #receiptContent { font-size: 14px; line-height: 1.8; font-weight: 300; }
 
-    /* ── 5월 2일 공지 배너 ── */
-    .may2-notice-bar {
-      background: var(--surface-2);
-      border: 1px solid var(--line-soft);
-      border-radius: var(--r-sm);
-      padding: 12px 16px;
-      font-size: 12.5px;
-      line-height: 1.75;
-      color: var(--text);
-      font-family: 'Pretendard', -apple-system, sans-serif;
-      font-weight: 300;
-      letter-spacing: 0.02em;
-    }
-    .may2-notice-bar strong { font-weight: 600; }
-    /* 랜딩 About 섹션 안 (meta-row 사이에서 자연스럽게) */
-    .meta-row .may2-notice-bar {
-      margin-top: 8px;
-      font-size: 12px;
-    }
-    /* 신청폼 상단 배너 */
-    #may2BookingBar .may2-notice-bar {
-      margin-bottom: 20px;
-    }
-    /* 완료 화면 배너 */
-    #may2CompleteBar .may2-notice-bar {
-      margin-top: 20px;
-      text-align: center;
-    }
   </style>
 </head>
 <body>
@@ -1634,7 +1606,6 @@
 <section id="sec-booking">
   <div class="book-inner">
     <div class="book-sec-label">Application</div>
-    <div id="may2BookingBar"></div>
 
     <!-- (랜딩 히어로의 returnHero로 이전됨 — 폼 안의 배너는 제거) -->
 
@@ -1773,7 +1744,6 @@
       아래 계좌로 입금하시면 접수가 최종 확정됩니다.<br>
       <span>확인 후 안내 문자를 보내드릴게요.</span>
     </div>
-    <div id="may2CompleteBar"></div>
     <div class="bank-box">
       <div class="bank-number">국민 904736-56-545</div>
       <div class="bank-holder">예금주 · 최승훈</div>
@@ -1824,11 +1794,6 @@
   var ONE_DAY_PRICE=35000, BANK_INFO='국민 904736-56-545 최승훈';
   var isFinalSubmitted=false, dataLoaded=false;
 
-  /* ── 5월 2일 수업 시간 변경 공지 (2026-05-03 KST 이후 자동 소멸) ── */
-  var MAY2_NOTICE_ACTIVE = (new Date() < new Date('2026-05-03T00:00:00+09:00'));
-  var MAY2_CLASS_DATE = '2026-05-02';
-  var MAY2_NOTICE_HTML = '<div class="may2-notice-bar">5월 2일(토) 수업은 <strong>11:00</strong> 시작이에요. 평소(10:30)와 달라요.</div>';
-
   /* ══════════════════════════════════════════════════════════
      VIEW LAYER
      ══════════════════════════════════════════════════════════ */
@@ -1839,9 +1804,6 @@
     }, { threshold: 0.12 });
     document.querySelectorAll('.fi').forEach(function(el) { io.observe(el); });
   })();
-
-  // 5월 2일 공지 초기 주입
-  _initMay2Notices();
 
   function showCustomAlert(msg) {
     document.getElementById('customAlertMsg').innerText = msg;
@@ -1864,7 +1826,6 @@
       var noticeEl = document.getElementById('receiptNotice');
       if (isFinalSubmitted) {
         var noticeTxt = '나마스떼.<br>접수가 완료되어 단계는 더 돌아가지 않아요.<br>신청 내역은 아래와 같고, 곧 문자로 인사드릴게요.';
-        if (MAY2_NOTICE_ACTIVE) noticeTxt += '<br><br><strong>5월 2일(토) 수업은 11:00 시작이에요.</strong> 평소(10:30)와 달라요.';
         noticeEl.innerHTML = noticeTxt;
         noticeEl.style.display = 'block';
       } else {
@@ -3045,29 +3006,6 @@
       btn.innerText = '국민 904736-56-545 · 최승훈 · ' + amountStr;
       setTimeout(function(){ btn.innerText = '계좌 정보 복사'; }, 4000);
     }
-  }
-
-  /* ══════════════════════════════════════════════════════════
-     5월 2일 시간 변경 공지 주입 (MAY2_NOTICE_ACTIVE 기간에만)
-     ══════════════════════════════════════════════════════════ */
-  function _initMay2Notices() {
-    if (!MAY2_NOTICE_ACTIVE) return;
-
-    // 1. 랜딩 About — When 행에 부연 표시
-    var whenEl = document.getElementById('whenMetaVal');
-    if (whenEl) {
-      whenEl.innerHTML =
-        '매주 토요일 10:30<small>70분 수련</small>' +
-        '<div class="may2-notice-bar" style="margin-top:10px;">5월 2일(토)은 예외적으로 <strong>11:00</strong> 시작이에요.</div>';
-    }
-
-    // 2. 신청폼 상단 배너
-    var bookBar = document.getElementById('may2BookingBar');
-    if (bookBar) bookBar.innerHTML = MAY2_NOTICE_HTML;
-
-    // 3. 완료 화면 배너
-    var compBar = document.getElementById('may2CompleteBar');
-    if (compBar) compBar.innerHTML = MAY2_NOTICE_HTML;
   }
 
   function resetApp() {

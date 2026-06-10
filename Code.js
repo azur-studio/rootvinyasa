@@ -243,26 +243,9 @@ function handleSpreadsheetEdit(e) {
 
 // ──────────────────────────────────────────────
 // 9. 휴강 추가·삭제 (관리자 화면용)
-//    ✅ [복구] V5.0/5.2에 있었다가 V5.8에서 사라진 기능
+//    addHoliday: 섹션 42에 정의 (SMS 자동화 포함 완전판)
+//    removeHoliday: 아래 정의
 // ──────────────────────────────────────────────
-function addHoliday(dateStr, reason, type) {
-  try {
-    var ss = SpreadsheetApp.openById(SS_ID);
-    var hSheet = ss.getSheetByName(SHEET_HOLIDAY);
-    if (!hSheet) return false;
-    var safeType = (type === '선택') ? '선택' : '일반';
-    var dateObj = parseSafeDate(dateStr);
-    if (!dateObj) return false;
-    
-hSheet.insertRowAfter(1);
-hSheet.getRange(2, 1, 1, 3).setValues([[dateObj, reason || '', safeType]]);
-// A열 날짜 서식
-hSheet.getRange(2, 1).setNumberFormat('yyyy-MM-dd');
-    rebuildAllMemberDates();
-    sendHolidayNoticeAll(formatDateSafe(dateObj), reason, safeType);
-    return true;
-  } catch(ex) { return false; }
-}
 
 function removeHoliday(dateStr) {
   try {
@@ -1745,31 +1728,6 @@ function getSMSTemplate(type, vars) {
 // 36. 결제 확인 → 문자 발송 연결
 //     confirmPaymentAdmin() 호출 후 실행
 // ──────────────────────────────────────────────
-// 5월 2일 수업 시간 변경 안내 문구 반환 (해당 날짜이거나 패스 기간이 5/2 포함 시)
-function _getMay2SmsNote(startDateStr, endDateStr) {
-  try {
-    var MAY2 = '2026-05-02';
-    var now = new Date();
-    var limit = new Date('2026-05-03T00:00:00+09:00');
-    if (now >= limit) return ''; // 5/2 지나면 자동 소멸
-
-    var s = startDateStr ? String(startDateStr).trim() : '';
-    var e = endDateStr   ? String(endDateStr).trim()   : '';
-
-    // 시작일이 정확히 5/2이거나, 패스 기간 안에 5/2가 포함되거나, 원데이 당일이 5/2
-    var covers = false;
-    if (s === MAY2) {
-      covers = true;
-    } else if (s && e) {
-      // 시작~종료 범위에 5/2가 포함되는지
-      var sd = parseSafeDate(s), ed = parseSafeDate(e), md = parseSafeDate(MAY2);
-      if (sd && ed && md && sd <= md && md <= ed) covers = true;
-    }
-
-    if (covers) return '\n\n참고로 5월 2일(토) 수업은 11:00 시작이에요. 평소(10:30)와 다르니 꼭 확인해 주세요.';
-    return '';
-  } catch(ex) { return ''; }
-}
 
 function sendPaymentConfirmedSMS(name, phone, option, schedule, memo) {
   try {
@@ -1778,9 +1736,6 @@ function sendPaymentConfirmedSMS(name, phone, option, schedule, memo) {
     var endDate   = String(schedule || '').split('~')[1] ? String(schedule || '').split('~')[1].trim() : '';
     var d = parseSafeDate(startDate);
     var dateLabel = d ? ((d.getMonth() + 1) + '월 ' + d.getDate() + '일') : startDate;
-
-    // 5월 2일 공지 (해당 날짜 포함 패스에만)
-    var may2Note = _getMay2SmsNote(startDate, endDate);
 
     // 교체 핵심: 메세지 변수를 최상단에 단 한 번만 선언하여 충돌 방지
     var msg = '';
@@ -1796,7 +1751,6 @@ function sendPaymentConfirmedSMS(name, phone, option, schedule, memo) {
       } else {
         msg = getSMSTemplate('결제확정원데이혼자', { '이름': name, '시작일': dateLabel, '메모확인': memoLine });
       }
-      if (msg && may2Note) msg = msg + may2Note;
       enqueueSMS(phone, name, msg, '결제확정', SMS_STATUS.IMMEDIATE);
 
     } else {
@@ -1869,7 +1823,6 @@ function sendPaymentConfirmedSMS(name, phone, option, schedule, memo) {
           '메모확인': memoLine
         });
       }
-      if (msg && may2Note) msg = msg + may2Note;
       enqueueSMS(phone, name, msg, '결제확정', SMS_STATUS.IMMEDIATE);
     }
   } catch(ex) { Logger.log('[sendPaymentConfirmedSMS] ' + ex); }
@@ -2062,17 +2015,7 @@ function _generateReminderMessages(members, settings) {
 
     var location = settings['스튜디오 위치'] || '서울 용산구';
     var classDate = members[0].classDate;
-
-    // 5월 2일 시간 변경 — classTime을 실제 당일 시간으로 보정
-    var isMay2Class = (String(classDate).replace(/\//g, '-') === '2026-05-02');
-    var now = new Date();
-    var may2Limit = new Date('2026-05-03T00:00:00+09:00');
-    var classTime = (isMay2Class && now < may2Limit)
-      ? '11:00~12:10'
-      : (settings['수업 시간'] || '10:30~11:40');
-    var may2ReminderNote = (isMay2Class && now < may2Limit)
-      ? '\n\n[⚠️ 이번 주 시간 변경]\n수업 시작 시간이 평소(10:30)와 달리 11:00이에요. 문자에 자연스럽게, 하지만 명확하게 포함해 주세요.'
-      : '';
+    var classTime = settings['수업 시간'] || '10:30~11:40';
 
     // 1. 날씨 조회 (무비용 유지를 위해 검색 도구는 OFF 처리 권장)
     var weatherInfo = '';
@@ -2106,8 +2049,7 @@ function _generateReminderMessages(members, settings) {
       // 사용자 요청 원본 로직 전체 수용
       var prompt =
         '요가 스튜디오 Root Vinyasa 문자 도우미.\n\n' +
-        '[시트 설정 내용]\n- 스타일: ' + (stylePrompt || '') + '\n- 세부지시: ' + (reminderPrompt || '') +
-        may2ReminderNote + '\n\n' +
+        '[시트 설정 내용]\n- 스타일: ' + (stylePrompt || '') + '\n- 세부지시: ' + (reminderPrompt || '') + '\n\n' +
         '[내일 날씨/상황]\n' + (weatherInfo || '정보 없음') + '\n\n' +
         '[대상 회원 데이터]\n' + JSON.stringify(memberData, null, 2) + '\n\n' +
         'JSON 배열만 반환. [{"name":"..","message":".."}]';
@@ -2132,10 +2074,6 @@ function _generateReminderMessages(members, settings) {
 
 
 
-
-// ──────────────────────────────────────────────
-// 40. (삭제됨 — 만료임박은 전날알림에 통합)
-// ──────────────────────────────────────────────
 
 
 // ──────────────────────────────────────────────
@@ -2958,8 +2896,7 @@ function buildFallbackReminder(member, memberData) {
   var isOneDay  = member.totalW === 1;
   var holidays  = memberData.holidays || [];
 
-  var isMay2Fb = (member.tomorrowStr === '2026-05-02') && (new Date() < new Date('2026-05-03T00:00:00+09:00'));
-  var timeKor  = isMay2Fb ? '11시' : '10시 30분';
+  var timeKor  = '10시 30분';
   var hasPause = !isOneDay && maxPauses > 0 && pauseLeft > 0;
   var isLast   = !isOneDay && remaining === 1;
 
@@ -2978,12 +2915,6 @@ function buildFallbackReminder(member, memberData) {
     lines.push('내일 오전 ' + timeKor + '\n이번 패스 마지막 수업이에요.');
   } else {
     lines.push('내일 오전 ' + timeKor + '\n루트 빈야사 수업이 예정되어 있어요.');
-  }
-
-  // ── 5/2 시간 변경 공지 ────────────────────────────
-  if (isMay2Fb) {
-    lines.push('');
-    lines.push('- 이번 주 시작 시간: 11:00\n  (평소 10:30과 달라요)');
   }
 
   // ── 정보 블록 ─────────────────────────────────────
@@ -3115,13 +3046,8 @@ function processOneReminderMember() {
     note: _extractBodyNote(member.memo) || ''
   };
 
-  // 5월 2일 시간 변경 체크
   var settings = getSettings();
-  var isMay2Rm = (member.tomorrowStr === '2026-05-02') && (new Date() < new Date('2026-05-03T00:00:00+09:00'));
-  var classTimeRm = isMay2Rm ? '11:00' : (settings['수업 시작 시간'] || '10:30');
-  var may2NoteRm = isMay2Rm
-    ? '\n\n⚠️ 이번 주는 수업 시작 시간이 11:00이에요 (평소 10:30과 다릅니다). 문자 안에 자연스럽게, 그러나 반드시 명확하게 포함해주세요.'
-    : '';
+  var classTimeRm = settings['수업 시작 시간'] || '10:30';
 
   var prompt =
     '당신은 요가 스튜디오 Root Vinyasa 문자 담당자입니다.\n' +
@@ -3164,7 +3090,6 @@ function processOneReminderMember() {
 
     '[상황별 작성 규칙]\n' +
     (reminderPrompt || '남은 횟수 자연스럽게. 쉬어가기 안내. 첫 수업이면 환영.') +
-    may2NoteRm +
     (specialNotice
       ? '\n\n[이번 주 특별 공지 — 반드시 포함]\n' + specialNotice + '\n' +
         '→ 위 문자 구조 8)번 공지 단락 위치에 넣어주세요.\n' +
