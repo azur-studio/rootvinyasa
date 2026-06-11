@@ -1104,7 +1104,7 @@
           </div>
         ${(p.totalWeeks > 1 && ((p.status === '만료' && p.expiredDays <= 14) || (p.status === '수강중' && p.remainingWeeks === 1))) ? `
           <div class="renewal-toggle-row${m.renewalPending ? ' active' : ''}" id="renewal_row_${pkSafe}">
-            <span class="renewal-toggle-label">연장 예정 알림</span>
+            <span class="renewal-toggle-label">전날 등록 안내</span>
             <label class="switch">
               <input type="checkbox" id="renewal_chk_${pkSafe}" ${m.renewalPending ? 'checked' : ''}
                 onchange="handleRenewalToggle(this,'${escapeJsAttr(m.name)}','${escapeJsAttr(m.phone)}')">
