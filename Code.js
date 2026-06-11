@@ -2012,73 +2012,6 @@ function _isInRange(dateStr, datesG) {
 }
 
 
-// ──────────────────────────────────────────────
-// 39. Gemini 전날알림 생성 (로직 보존 + 무비용 최적화)
-// ──────────────────────────────────────────────
-function _generateReminderMessages(members, settings) {
-  try {
-    var stylePrompt = getGeminiPrompt('문자 스타일');
-    var reminderPrompt = getGeminiPrompt('전날알림 지시');
-    var weatherPrompt = getGeminiPrompt('날씨/오시는 길 지시');
-
-    var location = settings['스튜디오 위치'] || '서울 용산구';
-    var classDate = members[0].classDate;
-    var classTime = settings['수업 시간'] || '10:30~11:40';
-
-    // 1. 날씨 조회 (무비용 유지를 위해 검색 도구는 OFF 처리 권장)
-    var weatherInfo = '';
-    try {
-      weatherInfo = callGemini(
-        location + ' ' + classDate + ' ' + classTime + ' 시간대 날씨 예상.\n' +
-        (weatherPrompt || '기온, 일교차 등 참고 정보.') +
-        '\n사실만 간결하게 3줄 이내.',
-        false // 할당량 보존을 위해 검색 기능 해제
-      );
-    } catch(ex) { Logger.log('[weather] ' + ex); }
-
-    // 2. 인지적 분할 (3명씩 묶음 처리)
-    var chunkSize = 3;
-    for (var i = 0; i < members.length; i += chunkSize) {
-      var chunk = members.slice(i, i + chunkSize);
-      
-      var memberData = chunk.map(function(m) {
-  return {
-    name: m.name,
-    remaining: m.remainingClasses,
-    totalWeeks: m.totalClasses,
-    pauseRemaining: m.pauseStatus.remaining,
-    isFirst: m.flags.isFirstClass,
-    nextPassPurchased: m.flags.nextPassPurchased,
-    holidays: m.upcomingHolidays,
-    note: m.memberNote
-  };
-});
-
-      // 사용자 요청 원본 로직 전체 수용
-      var prompt =
-        '요가 스튜디오 Root Vinyasa 문자 도우미.\n\n' +
-        '[시트 설정 내용]\n- 스타일: ' + (stylePrompt || '') + '\n- 세부지시: ' + (reminderPrompt || '') + '\n\n' +
-        '[내일 날씨/상황]\n' + (weatherInfo || '정보 없음') + '\n\n' +
-        '[대상 회원 데이터]\n' + JSON.stringify(memberData, null, 2) + '\n\n' +
-        'JSON 배열만 반환. [{"name":"..","message":".."}]';
-
-      var results = callGeminiJSON(prompt);
-
-      for (var j = 0; j < results.length; j++) {
-        var r = results[j];
-        var member = chunk.filter(function(m){ return m.name === r.name; })[0];
-        if (member) {
-          enqueueSMS(member.phone, member.name, r.message, '전날알림', SMS_STATUS.WAITING);
-        }
-      }
-
-      // 3. API 안정성을 위한 20초 휴식
-      if (i + chunkSize < members.length) {
-        Utilities.sleep(20000); 
-      }
-    }
-  } catch(ex) { Logger.log('[_generateReminderMessages] ' + ex); }
-}
 
 
 
@@ -2380,12 +2313,9 @@ function setupSMSSheets() {
 
   var settingsData = [
     ['항목', '값', '설명'],
-    // ── 기본 정보 ──
-    ['강사명',           '최승훈',           '문자에 표시되는 이름'],
-    ['강사 전화번호',    '01043130150',      '시스템 알림 수신 번호'],
     // ── 수업 시간 ──
     ['수업 시작 시간',   '10:30',            '수업 시작 (HH:MM)'],
-    ['수업 종료 시간',   '11:40',            '수업 종료 (HH:MM)'],
+    ['퇴실 시간',        '12:00',            '수업 종료 후 퇴실 시각 (결제확정 문자에 표시)'],
     ['입장 시간',        '10:15',            '수업 전 입장 가능 시각 (결제확정 문자에 표시)'],
     ['당일 신청 마감',   '12:40',            '이 시각 이후 당일을 시작일로 신청 불가 (수업 종료 + 1시간 권장)'],
     // ── 스튜디오 정보 (결제확정 문자에 반영) ──
@@ -2414,15 +2344,15 @@ function setupSMSSheets() {
   sSheet.setColumnWidth(3, 380);
   sSheet.setFrozenRows(1);
 
-  // 드롭다운: 시간 (0~23) — 생성(행15), 발송(행16), 브리핑(행19)
+  // 드롭다운: 시간 (0~23) — 생성(행12), 발송(행13), 브리핑(행16)
   var hourList = [];
   for (var h = 0; h <= 23; h++) hourList.push(String(h));
   var hourRule = SpreadsheetApp.newDataValidation().requireValueInList(hourList, true).setAllowInvalid(false).build();
-  [15, 16, 19].forEach(function(r) { sSheet.getRange(r, 2).setDataValidation(hourRule); });
+  [12, 13, 16].forEach(function(r) { sSheet.getRange(r, 2).setDataValidation(hourRule); });
 
-  // 드롭다운: ON/OFF — 브리핑(행18)
+  // 드롭다운: ON/OFF — 브리핑(행15)
   var onOffRule = SpreadsheetApp.newDataValidation().requireValueInList(['ON', 'OFF'], true).setAllowInvalid(false).build();
-  [18].forEach(function(r) { sSheet.getRange(r, 2).setDataValidation(onOffRule); });
+  [15].forEach(function(r) { sSheet.getRange(r, 2).setDataValidation(onOffRule); });
 
   // ── ✏️ Gemini 프롬프트 시트 ──
   var pSheet = ss.getSheetByName(SHEET_PROMPTS) || ss.insertSheet(SHEET_PROMPTS);
@@ -2433,11 +2363,8 @@ function setupSMSSheets() {
       '1인칭, 현재형. 짧은 문장. 여백이 언어의 일부.\n관찰하고 안내하는 말투. 이모지 없음.\n~하세요/~해보세요 (지시) 금지.\n함께해요/공유해주세요 (유도) 금지.\n당신은 소중합니다 (추상 웰니스) 금지.\n판매성·작별성 문구 금지.\n숫자는 한국어로 (1→한 번, 2→두 번, 3→세 번).\n13~15자 내외에서 줄바꿈 — 문자에서 줄이 너무 길면 읽기 어려움.\n항목 여러 개는 반드시 줄바꿈으로 분리 (·나 ,로 한 줄 나열 금지).\n받는 사람이 "나만 받는 문자" 같은 느낌.'],
     ['전날알림 지시',
       '내일 수업 안내. 매주 같은 문자가 아니라 그 주의 상황에 따라 구성이 달라져야 함.\n\n[남은 수업 안내]\n4회 이상: 정보 블록에 담백하게 "- 남은 수업: N번" 한 줄.\n3회: 자연스럽게 녹이거나 정보 블록에 포함.\n2회: 부드럽게 예고. "두 번 남아있어요. 이후 패스는 편하게 말씀해 주세요."\n1회(마지막): 메시지 핵심. "어느덧 마지막 수업이네요." 등. 따뜻한 마무리.\n단, 다음 패스 이미 결제했으면 만료·남은 횟수 관련 문구 전부 제외.\n\n[쉬어가기]\n남아있을 때: 정보 블록에 "- 남은 쉬어가기: N번". 뒤에 "(사정이 생기시면 자정까지\\n문자로 알려주세요.)" 추가.\n3회 이하면 더 강조.\n소진: 쉬어가기 언급 없이.\n\n첫 수업이면 "내일 첫 수업이에요. 기쁜 마음으로 기다리고 있어요." 류의 환영 메시지.\n휴강 예정 있으면 정보 블록에 "- {날짜} 휴강" 한 줄.'],
-    ['날씨/오시는 길 지시',
-      '수업 시간 기준 일교차, 옷차림, 빙판길, 우산, 미세먼지.\n꽃이 피면 오시는 길에 꽃 구경, 하늘이 맑으면 하늘 보기.\n단순 날씨 보고가 아니라 오시는 길의 경험을 한 줄로.'],
     ['휴강안내 지시',
       '일반: 수업이 쉽니다 + 사유 + 수업 한 번은 남아있음.\n선택: 오셔도 되고 쉬셔도 됨 + 쉬시면 차감 없음.\n긴급(당일/전날): 양해와 미안함 표현 필수.\n갑작스러운 안내 드려 죄송하다는 마음.'],
-    ['결제확정 (미정)', '⚠️ 추후 확정 — 포함할 내용 정리 후 반영'],
     ['금주 공지', '', '이번 주 전날알림에만 포함할 한 줄 공지.\n예) "다음 주 6/7은 휴강입니다"\n예) "이번 주 매트 세탁으로 개인 매트 지참 부탁드려요"\n없으면 비워두세요. Gemini가 정보 블록에 자연스럽게 녹여줍니다.']
   ];
   pSheet.getRange(1, 1, promptData.length, 2).setValues(promptData);
@@ -3346,4 +3273,67 @@ function _buildRenewalHolidayMsg(name, tomorrowStr, weatherNote) {
     weatherNote + '\n' +
     '좋은 주말 보내세요!'
   );
+}
+
+
+// ──────────────────────────────────────────────
+// 54. 시트 감사 + 라이브 데이터 정리 (1회 실행)
+//     GAS 편집기에서 auditAndCleanSheets() 직접 실행
+//     → 실행 로그에서 ❓ 항목(예상 외 시트) 확인 후 수동 삭제 여부 결정
+// ──────────────────────────────────────────────
+function auditAndCleanSheets() {
+  var ss = SpreadsheetApp.openById(SS_ID);
+  var allSheets = ss.getSheets();
+  var expected = [
+    SHEET_DB_NEW, SHEET_LOG, SHEET_HOLIDAY,
+    SHEET_SETTINGS, SHEET_PROMPTS,
+    SHEET_SMS_QUEUE, SHEET_SMS_ARCHIVE, SHEET_RENEWAL
+  ];
+
+  // ── 시트 목록 감사 ──────────────────────────
+  var report = ['[시트 목록]'];
+  var unexpected = [];
+  allSheets.forEach(function(s) {
+    var n = s.getName();
+    var ok = expected.indexOf(n) !== -1;
+    report.push((ok ? '✅ ' : '❓ ') + n);
+    if (!ok) unexpected.push(n);
+  });
+  Logger.log(report.join('\n'));
+
+  // ── ⚙️ 설정 시트: 죽은 행 삭제 + 키 이름 수정 ──
+  var sSheet = ss.getSheetByName(SHEET_SETTINGS);
+  if (sSheet) {
+    var sData = sSheet.getDataRange().getValues();
+    var deadKeys   = ['강사명', '강사 전화번호', '수업 종료 시간'];
+    var renameKeys = { '수업 종료 시간': '퇴실 시간' };
+    for (var i = sData.length - 1; i >= 1; i--) {
+      var k = String(sData[i][0]).trim();
+      if (k === '수업 종료 시간') {
+        sSheet.getRange(i + 1, 1).setValue('퇴실 시간');
+        Logger.log('설정 이름 수정: 수업 종료 시간 → 퇴실 시간');
+      } else if (k === '강사명' || k === '강사 전화번호') {
+        sSheet.deleteRow(i + 1);
+        Logger.log('설정 삭제: ' + k);
+      }
+    }
+  }
+
+  // ── ✏️ 프롬프트 시트: 죽은 행 삭제 ──────────
+  var pSheet = ss.getSheetByName(SHEET_PROMPTS);
+  if (pSheet) {
+    var pData = pSheet.getDataRange().getValues();
+    var deadPrompts = ['날씨/오시는 길 지시', '결제확정 (미정)'];
+    for (var j = pData.length - 1; j >= 1; j--) {
+      if (deadPrompts.indexOf(String(pData[j][0]).trim()) !== -1) {
+        pSheet.deleteRow(j + 1);
+        Logger.log('프롬프트 삭제: ' + pData[j][0]);
+      }
+    }
+  }
+
+  var summary = '정리 완료. 예상 외 시트 ' + unexpected.length + '개: ' +
+    (unexpected.length ? unexpected.join(', ') : '없음');
+  Logger.log(summary);
+  return summary;
 }
