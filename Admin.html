@@ -83,6 +83,9 @@
     .type-badge.oneday { background: var(--orange); color: #FFF; }
     .dup-badge { background: #FFEBEA; color: var(--red); font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 4px; margin-left: 6px; }
     .conflict-badge { background: #FFF3CD; color: #856404; font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 4px; margin-left: 6px; }
+    .renewal-toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 11px 15px; border-top: 1px solid var(--line); margin-top: 2px; }
+    .renewal-toggle-label { font-size: 14px; font-weight: 600; color: var(--text-light); }
+    .renewal-toggle-row.active .renewal-toggle-label { color: var(--blue); }
     .pending-item { flex-direction: column; align-items: flex-start; }
     .pending-info { width: 100%; margin-bottom: 15px; }
     .btn-approve { width: 100%; background: var(--accent); color: #FFF; border: none; padding: 12px; font-size: 15px; font-weight: 600; border-radius: 12px; cursor: pointer; transition: 0.2s; }
@@ -1099,6 +1102,15 @@
             </div>` : (!isExpired ? '<div style="font-size:13px; color:#BBB; padding:10px 0;">남은 수업이 없습니다.</div>' : '')}
             ${pausedRows ? `<div class="schedule-wrap"><div style="font-size:12px; font-weight:700; margin-bottom:8px; color:var(--red);">[쉬어가기 처리된 일정]</div>${pausedRows}</div>` : ''}
           </div>
+        ${(p.totalWeeks > 1 && ((p.status === '만료' && p.expiredDays <= 14) || (p.status === '수강중' && p.remainingWeeks === 1))) ? `
+          <div class="renewal-toggle-row${m.renewalPending ? ' active' : ''}" id="renewal_row_${pkSafe}">
+            <span class="renewal-toggle-label">연장 예정 알림</span>
+            <label class="switch">
+              <input type="checkbox" id="renewal_chk_${pkSafe}" ${m.renewalPending ? 'checked' : ''}
+                onchange="handleRenewalToggle(this,'${escapeJsAttr(m.name)}','${escapeJsAttr(m.phone)}')">
+              <span class="slider"></span>
+            </label>
+          </div>` : ''}
         </div>`;
     });
 
@@ -1141,6 +1153,30 @@
     document.getElementById('editModalBackdrop').classList.remove('show');
     document.getElementById('editModalSheet').classList.remove('show');
     emergencyMode = false;
+  }
+
+  function handleRenewalToggle(chk, name, phone) {
+    chk.disabled = true;
+    var isOn = chk.checked;
+    var row = chk.closest('.renewal-toggle-row');
+    google.script.run
+      .withSuccessHandler(function(ok) {
+        if (ok) {
+          if (row) row.classList.toggle('active', isOn);
+          var m = membersData.find(function(x){ return x.name === name && x.phone === phone; });
+          if (m) m.renewalPending = isOn;
+        } else {
+          chk.checked = !isOn;
+          showCustomAlert('오류가 발생했습니다. 다시 시도해 주세요.');
+        }
+        chk.disabled = false;
+      })
+      .withFailureHandler(function() {
+        chk.checked = !isOn;
+        chk.disabled = false;
+        showCustomAlert('서버 오류가 발생했습니다.');
+      })
+      .setRenewalPending(name, phone, isOn);
   }
 
   function togglePassCard(passKey) {

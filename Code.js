@@ -929,6 +929,11 @@ function getAdminMembersList() {
     var dbData  = dbSheet.getDataRange().getValues();
     var membersMap = {};
     var today = new Date(); today.setHours(0, 0, 0, 0);
+    var _renewalSet = {};
+    try {
+      var _rPending = JSON.parse(PropertiesService.getScriptProperties().getProperty('RENEWAL_PENDING') || '[]');
+      _rPending.forEach(function(r) { _renewalSet[r.name + '_' + r.phone] = true; });
+    } catch(e) {}
 
     for (var i = 1; i < dbData.length; i++) {
       var row = dbData[i];
@@ -971,11 +976,12 @@ function getAdminMembersList() {
         status: status,
         remainingDays: remD,
         remainingWeeks: remW,
+        expiredDays: (status === '만료' && datesG.length > 0) ? Math.floor((today - parseSafeDate(datesG[datesG.length - 1])) / 86400000) : 0,
         upcomingDates: datesG,
         pauseHistory: datesH
       };
       var mKey = String(row[1]) + '_' + phone;
-      if (!membersMap[mKey]) membersMap[mKey] = { name: String(row[1]), phone: phone, memo: String(row[8] || ''), passes: [] };
+      if (!membersMap[mKey]) membersMap[mKey] = { name: String(row[1]), phone: phone, memo: String(row[8] || ''), passes: [], renewalPending: !!_renewalSet[mKey] };
       membersMap[mKey].passes.push(passObj);
     }
     return Object.values(membersMap);
@@ -2687,6 +2693,26 @@ function prepareReminderQueue() {
     }
 
     var props = PropertiesService.getScriptProperties();
+
+    // ── 연장 예정 회원: 내일이 토요일(수업일)이면 큐에 추가 ──────────
+    var isTomSaturday = tomorrow.getDay() === 6;
+    if (isTomSaturday) {
+      var isTomHoliday = holidayData.all.indexOf(tomorrowStr) !== -1;
+      var renewalRaw   = props.getProperty('RENEWAL_PENDING');
+      var renewalList  = renewalRaw ? JSON.parse(renewalRaw) : [];
+      renewalList.forEach(function(r) {
+        var rKey = r.name + '_' + r.phone;
+        if (seen[rKey]) return; // 이미 일반 리마인드 대상이면 스킵
+        targets.push({
+          name: r.name, phone: r.phone,
+          isRenewalReminder: true,
+          isHoliday: isTomHoliday,
+          tomorrowStr: tomorrowStr
+        });
+        Logger.log('[prepareReminderQueue] 연장예정: ' + r.name + (isTomHoliday ? ' (휴강)' : ''));
+      });
+    }
+
     props.setProperty('REMINDER_QUEUE', JSON.stringify(targets));
     props.setProperty('REMINDER_RETRIES', '0');
     // 날씨는 processOneReminderMember 첫 실행 시 조회 (생성 시간에 맞춰 최신 정보 반영)
@@ -2963,6 +2989,33 @@ function processOneReminderMember() {
   }
 
   var member = queue[0];
+
+  // ── 연장 예정 문자 분기 (고정 템플릿, Gemini 불필요) ─────────────
+  if (member.isRenewalReminder) {
+    var _rSettings = getSettings();
+    var _classTime = _rSettings['수업 시작 시간'] || '10:30';
+    var _wNote     = weatherNote || _getSeasonalClosingVaried(member.tomorrowStr);
+    var _renewalMsg;
+    if (member.isHoliday) {
+      _renewalMsg = _buildRenewalHolidayMsg(member.name, member.tomorrowStr, _wNote);
+      // 휴강: 토글 유지 (다음 정상 수업일에 재발송)
+    } else {
+      _renewalMsg = _buildRenewalReminderMsg(member.name, member.tomorrowStr, _classTime, _wNote);
+      // 정상 수업: 발송 후 토글 해제
+      var _rList = JSON.parse(props.getProperty('RENEWAL_PENDING') || '[]');
+      _rList = _rList.filter(function(r){ return !(r.name === member.name && r.phone === member.phone); });
+      props.setProperty('RENEWAL_PENDING', JSON.stringify(_rList));
+    }
+    enqueueSMS(member.phone, member.name, _renewalMsg,
+      member.isHoliday ? '연장예정(휴강)' : '연장예정', SMS_STATUS.WAITING);
+    queue.shift();
+    props.setProperty('REMINDER_QUEUE', JSON.stringify(queue));
+    props.setProperty('REMINDER_RETRIES', '0');
+    Logger.log('[processOneReminderMember] 연장예정 완료: ' + member.name + (member.isHoliday ? ' (휴강)' : ''));
+    if (queue.length === 0) clearSpecialNotice();
+    return;
+  }
+
   var stylePrompt    = getGeminiPrompt('문자 스타일');
   var reminderPrompt = getGeminiPrompt('전날알림 지시');
   var specialNotice  = getGeminiPrompt('금주 공지').trim();
@@ -3153,4 +3206,54 @@ function addSpecialNoticeRow() {
   sheet.getRange(lastRow, 3).setBackground('#f5f5f5').setFontColor('#888888').setWrap(true);
   sheet.setRowHeight(lastRow, 100);
   Logger.log('금주 공지 행 추가 완료 (행 ' + lastRow + ')');
+}
+
+
+// ──────────────────────────────────────────────
+// 52. 연장 예정 알림 토글 (관리자 전용)
+//     Admin.html 에서 호출. ScriptProperties 에 목록 저장.
+// ──────────────────────────────────────────────
+function setRenewalPending(name, phone, isOn) {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var list  = JSON.parse(props.getProperty('RENEWAL_PENDING') || '[]');
+    list = list.filter(function(r){ return !(r.name === name && r.phone === phone); });
+    if (isOn) list.push({ name: name, phone: phone });
+    props.setProperty('RENEWAL_PENDING', JSON.stringify(list));
+    return true;
+  } catch(ex) { Logger.log('[setRenewalPending] ' + ex); return false; }
+}
+
+
+// ──────────────────────────────────────────────
+// 53. 연장 예정 문자 템플릿 빌더
+// ──────────────────────────────────────────────
+function _timeToKorean(timeStr) {
+  var parts = String(timeStr || '10:30').split(':');
+  return (parts[0] || '10') + '시 ' + (parts[1] || '30') + '분';
+}
+
+function _buildRenewalReminderMsg(name, tomorrowStr, classTime, weatherNote) {
+  var timeKor = _timeToKorean(classTime);
+  return (
+    '[Root Vinyasa]\n' +
+    '안녕하세요, ' + name + '님!\n\n' +
+    '내일 오전 ' + timeKor + '\n루트 빈야사 수업이 있어요.\n\n' +
+    '연장 등록은 아래 링크에서\n편하게 해주세요.\n\n' +
+    '신청 · ' + BOOKING_LINK + '\n\n' +
+    weatherNote + '\n' +
+    '내일 뵙겠습니다!'
+  );
+}
+
+function _buildRenewalHolidayMsg(name, tomorrowStr, weatherNote) {
+  var d = parseSafeDate(tomorrowStr);
+  var dateLabel = d ? ((d.getMonth()+1) + '/' + d.getDate()) : '내일';
+  return (
+    '[Root Vinyasa]\n' +
+    '안녕하세요, ' + name + '님!\n\n' +
+    '내일(' + dateLabel + ')은 휴강이에요.\n다음 주에 뵙겠습니다.\n\n' +
+    weatherNote + '\n' +
+    '좋은 주말 보내세요!'
+  );
 }
