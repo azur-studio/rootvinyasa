@@ -2694,12 +2694,37 @@ function prepareReminderQueue() {
 
     var props = PropertiesService.getScriptProperties();
 
-    // ── 연장 예정 회원: 내일이 토요일(수업일)이면 큐에 추가 ──────────
+    // ── 토요일 전용 처리: 수강중 휴강 안내 + 연장 예정 ───────────────
     var isTomSaturday = tomorrow.getDay() === 6;
+    var isTomHoliday  = isTomSaturday && holidayData.mandatory.indexOf(tomorrowStr) !== -1;
+
     if (isTomSaturday) {
-      var isTomHoliday = holidayData.all.indexOf(tomorrowStr) !== -1;
-      var renewalRaw   = props.getProperty('RENEWAL_PENDING');
-      var renewalList  = renewalRaw ? JSON.parse(renewalRaw) : [];
+
+      // ── 수강중 전체 휴강 안내 (일반 휴강일 때만) ─────────────────
+      if (isTomHoliday) {
+        var holidaySeen = {};
+        for (var hb = 1; hb < data.length; hb++) {
+          var hbName  = String(data[hb][1] || '').trim();
+          var hbPhone = String(data[hb][2] || '').replace(/[^0-9]/g, '');
+          var hbKey   = hbName + '_' + hbPhone;
+          if (!hbName || hbPhone.length < 10 || holidaySeen[hbKey]) continue;
+          var hbDates = getSafeString(data[hb][6]).split(',').map(function(s){return s.trim();}).filter(Boolean);
+          if (hbDates.length === 0) continue;
+          var hbFirst = parseSafeDate(hbDates[0]);
+          var hbLast  = parseSafeDate(hbDates[hbDates.length - 1]);
+          if (!hbFirst || !hbLast) continue;
+          // 수강중: 첫 수업 ≤ 오늘 ≤ 마지막 수업
+          if (hbFirst <= today && hbLast >= today) {
+            holidaySeen[hbKey] = true;
+            targets.push({ name: hbName, phone: hbPhone, isHolidayNotification: true, tomorrowStr: tomorrowStr });
+            Logger.log('[prepareReminderQueue] 휴강안내: ' + hbName);
+          }
+        }
+      }
+
+      // ── 연장 예정 회원 ────────────────────────────────────────────
+      var renewalRaw  = props.getProperty('RENEWAL_PENDING');
+      var renewalList = renewalRaw ? JSON.parse(renewalRaw) : [];
       renewalList.forEach(function(r) {
         var rKey = r.name + '_' + r.phone;
         if (seen[rKey]) return; // 이미 일반 리마인드 대상이면 스킵
@@ -2720,9 +2745,10 @@ function prepareReminderQueue() {
     // 강사에게 준비 시작 알림
     var instructorPhone = PropertiesService.getScriptProperties().getProperty('INSTRUCTOR_PHONE');
     if (instructorPhone && targets.length > 0) {
-      enqueueSMS(instructorPhone, '최승훈',
-        '[ROOT] 전날알림 준비 시작\n내일 수업 대상 ' + targets.length + '명\n문자 생성을 시작합니다.',
-        '시스템알림', SMS_STATUS.IMMEDIATE);
+      var _instrMsg = isTomHoliday
+        ? '[ROOT] 휴강 안내 발송 시작\n' + tomorrowStr + ' 휴강\n안내 대상 ' + targets.length + '명'
+        : '[ROOT] 전날알림 준비 시작\n내일 수업 대상 ' + targets.length + '명\n문자 생성을 시작합니다.';
+      enqueueSMS(instructorPhone, '최승훈', _instrMsg, '시스템알림', SMS_STATUS.IMMEDIATE);
     }
 
     Logger.log('[prepareReminderQueue] 대상 ' + targets.length + '명 저장완료');
@@ -2989,6 +3015,19 @@ function processOneReminderMember() {
   }
 
   var member = queue[0];
+
+  // ── 수강중 휴강 안내 분기 (고정 템플릿) ─────────────────────────
+  if (member.isHolidayNotification) {
+    var _hNote = weatherNote || _getSeasonalClosingVaried(member.tomorrowStr);
+    var _hMsg  = _buildRenewalHolidayMsg(member.name, member.tomorrowStr, _hNote);
+    enqueueSMS(member.phone, member.name, _hMsg, '휴강안내', SMS_STATUS.WAITING);
+    queue.shift();
+    props.setProperty('REMINDER_QUEUE', JSON.stringify(queue));
+    props.setProperty('REMINDER_RETRIES', '0');
+    Logger.log('[processOneReminderMember] 휴강안내 완료: ' + member.name);
+    if (queue.length === 0) clearSpecialNotice();
+    return;
+  }
 
   // ── 연장 예정 문자 분기 (고정 템플릿, Gemini 불필요) ─────────────
   if (member.isRenewalReminder) {
