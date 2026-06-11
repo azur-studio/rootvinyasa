@@ -1983,49 +1983,6 @@ function dailyBatch() {
 
     var data = dbSheet.getDataRange().getValues();
 
-    // 만료후 안부 대상 수집
-    var followUpMembers = [];
-    var sent = {};
-
-    if (String(settings['수강 끝난 회원 안부']) === 'ON') {
-      var followUpDays = String(settings['안부 며칠째에'] || '1,6,13')
-        .split(',').map(function(s){ return Number(s.trim()); });
-
-      for (var i = 1; i < data.length; i++) {
-        var name  = String(data[i][1] || '').trim();
-        var phone = String(data[i][2] || '').replace(/[^0-9]/g, '');
-        var type  = String(data[i][3] || '');
-        var totalW = Number(data[i][5] || 0);
-        var datesG = getSafeString(data[i][6]).split(',').map(function(s){return s.trim();}).filter(Boolean);
-        var datesH = getSafeString(data[i][7]).split(',').map(function(s){return s.trim();}).filter(Boolean);
-        var memo   = String(data[i][8] || '');
-        if (!name || phone.length < 10 || datesG.length === 0) continue;
-
-        var key = name + '_' + phone;
-        var finalObj = parseSafeDate(datesG[datesG.length - 1]);
-        if (!finalObj) continue;
-
-        var maxP = calcMaxPauses(type, totalW);
-        var daysAfter = Math.floor((today - finalObj) / 86400000);
-
-        if (followUpDays.indexOf(daysAfter) !== -1 && !sent[key + '_fu']) {
-          followUpMembers.push({
-            name: name, phone: phone, type: type,
-            daysAfter: daysAfter,
-            totalClasses: totalW,
-            usedPauses: datesH.length,
-            maxPauses: maxP,
-            memo: memo.replace(/\[신체노트\]:[^\n]*/g, '').replace(/\[자율참석:[^\]]+\]/g, '').trim()
-          });
-          sent[key + '_fu'] = true;
-        }
-      }
-
-      if (followUpMembers.length > 0) {
-        _generateFollowUpMessages(followUpMembers, settings);
-      }
-    }
-
     // DB 서식 업데이트 (만료=회색, 임박=노랑, 예정=파랑)
     updateDBFormatting();
 
@@ -2113,60 +2070,6 @@ function _generateReminderMessages(members, settings) {
 
 
 
-
-// ──────────────────────────────────────────────
-// 41. Gemini 만료후 안부 생성 (승인대기)
-// ──────────────────────────────────────────────
-function _generateFollowUpMessages(members, settings) {
-  try {
-    var stylePrompt = getGeminiPrompt('문자 스타일');
-    var followUpPrompt = getGeminiPrompt('만료후 안부 지시');
-
-    var memberData = members.map(function(m) {
-      return { name: m.name, daysAfter: m.daysAfter, type: m.type, totalClasses: m.totalClasses, memo: m.memo || '' };
-    });
-
-    var prompt =
-      '당신은 요가 스튜디오 Root Vinyasa 문자 담당자입니다.\n' +
-      '수강이 끝난 회원에게 따뜻한 안부 문자를 작성해주세요.\n\n' +
-
-      '[문자 구조 — 반드시 이 순서와 형식을 따를 것]\n' +
-      '1) [Root Vinyasa]\n' +
-      '2) 안녕하세요, {이름}님!\n' +
-      '3) (빈 줄)\n' +
-      '4) 안부 메시지: 짧은 문장 1~2개. 13~15자 내외 지점에서 \\n 줄바꿈.\n' +
-      '   종료 후 며칠이 지났는지에 따라 거리감을 조절:\n' +
-      '   1일→따뜻하고 가깝게, 6일→자연스럽게, 13일→가볍고 담담하게.\n' +
-      '5) (빈 줄)\n' +
-      '6) 계절감 한 줄 + \\n편안한 하루 보내세요.\n\n' +
-
-      '[절대 금지]\n' +
-      '- 이모지\n' +
-      '- "다음 패스 기다릴게요", "언제든 돌아오세요" 등 재등록 유도 표현\n' +
-      '- "함께해 주셔서 좋았어요" 등 작별·판매성 문구\n' +
-      '- 내일 뵙겠습니다 (안부 문자에는 사용 금지)\n' +
-      '- "~하세요", "~해보세요" 등 지시형 말투\n' +
-      '- 숫자 숫자 표기 (1→한 번, 2→두 번 ...)\n\n' +
-
-      '[브랜드 스타일]\n' + (stylePrompt || '1인칭 현재형. 짧은 문장. 이모지 없음. 관찰하고 안내하는 말투.') + '\n\n' +
-
-      '[안부 규칙]\n' + (followUpPrompt || '안부 위주, 판매 금지. 거리감 조절: 1일=따뜻, 6일=자연, 13일=가볍게.') + '\n\n' +
-
-      '[회원 데이터]\n' + JSON.stringify(memberData) + '\n\n' +
-      '출력: JSON 배열만. 앞뒤 텍스트 없이.\n' +
-      '[{"name":"..","message":".."}]';
-
-    var results = callGeminiJSON(prompt);
-    for (var i = 0; i < results.length; i++) {
-      var member = members.filter(function(m){ return m.name === results[i].name; })[0];
-      if (member) {
-        // 만료후 안부 — 재등록 링크 첨부
-        var fuMsg = (results[i].message || '').trim() + '\n\n신청 · ' + BOOKING_LINK;
-        enqueueSMS(member.phone, member.name, fuMsg, '만료후안부', SMS_STATUS.APPROVAL);
-      }
-    }
-  } catch(ex) { Logger.log('[_generateFollowUpMessages] ' + ex); }
-}
 
 
 // ──────────────────────────────────────────────
@@ -2412,7 +2315,7 @@ function setupAllTriggers() {
   ScriptApp.newTrigger('prepareReminderQueue')
     .timeBased().everyDays(1).atHour(prepHour).create();
 
-// 매일 — 만료후 안부 + DB 서식 업데이트
+// 매일 — DB 서식 업데이트
   ScriptApp.newTrigger('dailyBatch')
     .timeBased().everyDays(1).atHour(prepHour).create();
 
@@ -2483,8 +2386,6 @@ function setupSMSSheets() {
     ['문자 생성 시간',   '9',    'Gemini가 대기열에 넣는 시각 (0~23)'],
     ['문자 발송 시간',   '9',    '대기열 실제 발송 시각 (0~23)'],
     ['휴강 안내 며칠 전부터', '28', '이 기간 안 휴강은 전날알림에 자동 포함'],
-    ['수강 끝난 회원 안부',  'ON',  'ON이면 수강 완료 회원에게 안부 문자'],
-    ['안부 며칠째에',    '1, 6, 13', '수강 끝난 후 며칠째에 안부 보낼지 (쉼표 구분)'],
     ['금요 브리핑 (강사용)', 'ON', 'ON이면 금요일 저녁 내일 수업 요약'],
     ['브리핑 시간',      '20',   '금요 브리핑 시각 (0~23)'],
     ['대기열 보관 기간', '30',   '발송 완료 후 며칠 뒤 아카이브로 이동']
@@ -2500,15 +2401,15 @@ function setupSMSSheets() {
   sSheet.setColumnWidth(3, 380);
   sSheet.setFrozenRows(1);
 
-  // 드롭다운: 시간 (0~23) — 생성(행15), 발송(행16), 브리핑(행21)
+  // 드롭다운: 시간 (0~23) — 생성(행15), 발송(행16), 브리핑(행19)
   var hourList = [];
   for (var h = 0; h <= 23; h++) hourList.push(String(h));
   var hourRule = SpreadsheetApp.newDataValidation().requireValueInList(hourList, true).setAllowInvalid(false).build();
-  [15, 16, 21].forEach(function(r) { sSheet.getRange(r, 2).setDataValidation(hourRule); });
+  [15, 16, 19].forEach(function(r) { sSheet.getRange(r, 2).setDataValidation(hourRule); });
 
-  // 드롭다운: ON/OFF — 안부(행18), 브리핑(행20)
+  // 드롭다운: ON/OFF — 브리핑(행18)
   var onOffRule = SpreadsheetApp.newDataValidation().requireValueInList(['ON', 'OFF'], true).setAllowInvalid(false).build();
-  [18, 20].forEach(function(r) { sSheet.getRange(r, 2).setDataValidation(onOffRule); });
+  [18].forEach(function(r) { sSheet.getRange(r, 2).setDataValidation(onOffRule); });
 
   // ── ✏️ Gemini 프롬프트 시트 ──
   var pSheet = ss.getSheetByName(SHEET_PROMPTS) || ss.insertSheet(SHEET_PROMPTS);
@@ -2521,8 +2422,6 @@ function setupSMSSheets() {
       '내일 수업 안내. 매주 같은 문자가 아니라 그 주의 상황에 따라 구성이 달라져야 함.\n\n[남은 수업 안내]\n4회 이상: 정보 블록에 담백하게 "- 남은 수업: N번" 한 줄.\n3회: 자연스럽게 녹이거나 정보 블록에 포함.\n2회: 부드럽게 예고. "두 번 남아있어요. 이후 패스는 편하게 말씀해 주세요."\n1회(마지막): 메시지 핵심. "어느덧 마지막 수업이네요." 등. 따뜻한 마무리.\n단, 다음 패스 이미 결제했으면 만료·남은 횟수 관련 문구 전부 제외.\n\n[쉬어가기]\n남아있을 때: 정보 블록에 "- 남은 쉬어가기: N번". 뒤에 "(사정이 생기시면 자정까지\\n문자로 알려주세요.)" 추가.\n3회 이하면 더 강조.\n소진: 쉬어가기 언급 없이.\n\n첫 수업이면 "내일 첫 수업이에요. 기쁜 마음으로 기다리고 있어요." 류의 환영 메시지.\n휴강 예정 있으면 정보 블록에 "- {날짜} 휴강" 한 줄.'],
     ['날씨/오시는 길 지시',
       '수업 시간 기준 일교차, 옷차림, 빙판길, 우산, 미세먼지.\n꽃이 피면 오시는 길에 꽃 구경, 하늘이 맑으면 하늘 보기.\n단순 날씨 보고가 아니라 오시는 길의 경험을 한 줄로.'],
-    ['만료후 안부 지시',
-      '안부 위주, 판매·재등록 권유 문구 금지.\n거리감 조절: 만료 1일 후=따뜻하고 가깝게, 6일=자연스럽게, 13일=가볍고 담담하게.\n"함께해 주셔서 좋았어요", "다시 오시길 기다릴게요" 등 작별·판매성 문구 금지.\n짧고 담백하게. 계절감 한 줄로 마무리. 재등록 링크는 별도 줄로 자동 첨부됨.'],
     ['휴강안내 지시',
       '일반: 수업이 쉽니다 + 사유 + 수업 한 번은 남아있음.\n선택: 오셔도 되고 쉬셔도 됨 + 쉬시면 차감 없음.\n긴급(당일/전날): 양해와 미안함 표현 필수.\n갑작스러운 안내 드려 죄송하다는 마음.'],
     ['결제확정 (미정)', '⚠️ 추후 확정 — 포함할 내용 정리 후 반영'],
