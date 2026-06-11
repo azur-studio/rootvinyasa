@@ -25,9 +25,10 @@
 //   속성 이름  ADMIN_PIN → 값: 관리자 PIN
 var _scriptProps_ = PropertiesService.getScriptProperties();
 var SS_ID        = _scriptProps_.getProperty('SS_ID');
-var SHEET_DB_NEW = '통합 수강 DB (신규)';
-var SHEET_LOG    = '결제 및 신청 로그 (신규)';
-var SHEET_HOLIDAY= '휴강 캘린더 (신규)';
+var SHEET_DB_NEW  = '통합 수강 DB (신규)';
+var SHEET_LOG     = '결제 및 신청 로그 (신규)';
+var SHEET_HOLIDAY = '휴강 캘린더 (신규)';
+var SHEET_RENEWAL = '📋 전날 등록 안내';
 var ADMIN_PIN    = _scriptProps_.getProperty('ADMIN_PIN');
 
 var REGEX_DATE_SEP = new RegExp('[./]', 'g');
@@ -931,8 +932,14 @@ function getAdminMembersList() {
     var today = new Date(); today.setHours(0, 0, 0, 0);
     var _renewalSet = {};
     try {
-      var _rPending = JSON.parse(PropertiesService.getScriptProperties().getProperty('RENEWAL_PENDING') || '[]');
-      _rPending.forEach(function(r) { _renewalSet[r.name + '_' + r.phone] = true; });
+      var _rnSheet = SpreadsheetApp.openById(SS_ID).getSheetByName(SHEET_RENEWAL);
+      if (_rnSheet && _rnSheet.getLastRow() > 1) {
+        var _rnData = _rnSheet.getRange(2, 1, _rnSheet.getLastRow() - 1, 2).getValues();
+        _rnData.forEach(function(row) {
+          var n = String(row[0]).trim(), p = String(row[1]).replace(/[^0-9]/g, '');
+          if (n && p) _renewalSet[n + '_' + p] = true;
+        });
+      }
     } catch(e) {}
 
     for (var i = 1; i < dbData.length; i++) {
@@ -2723,8 +2730,17 @@ function prepareReminderQueue() {
       }
 
       // ── 연장 예정 회원 ────────────────────────────────────────────
-      var renewalRaw  = props.getProperty('RENEWAL_PENDING');
-      var renewalList = renewalRaw ? JSON.parse(renewalRaw) : [];
+      var renewalList = [];
+      try {
+        var _rrSheet = ss.getSheetByName(SHEET_RENEWAL);
+        if (_rrSheet && _rrSheet.getLastRow() > 1) {
+          var _rrData = _rrSheet.getRange(2, 1, _rrSheet.getLastRow() - 1, 2).getValues();
+          _rrData.forEach(function(row) {
+            var n = String(row[0]).trim(), p = String(row[1]).replace(/[^0-9]/g, '');
+            if (n && p) renewalList.push({ name: n, phone: p });
+          });
+        }
+      } catch(_rre) { Logger.log('[prepareReminderQueue] SHEET_RENEWAL 읽기 실패: ' + _rre); }
       renewalList.forEach(function(r) {
         var rKey = r.name + '_' + r.phone;
         if (seen[rKey]) return; // 이미 일반 리마인드 대상이면 스킵
@@ -3040,10 +3056,20 @@ function processOneReminderMember() {
       // 휴강: 토글 유지 (다음 정상 수업일에 재발송)
     } else {
       _renewalMsg = _buildRenewalReminderMsg(member.name, member.tomorrowStr, _classTime, _wNote);
-      // 정상 수업: 발송 후 토글 해제
-      var _rList = JSON.parse(props.getProperty('RENEWAL_PENDING') || '[]');
-      _rList = _rList.filter(function(r){ return !(r.name === member.name && r.phone === member.phone); });
-      props.setProperty('RENEWAL_PENDING', JSON.stringify(_rList));
+      // 정상 수업: 발송 후 시트에서 행 삭제
+      try {
+        var _rdSheet = SpreadsheetApp.openById(SS_ID).getSheetByName(SHEET_RENEWAL);
+        if (_rdSheet && _rdSheet.getLastRow() > 1) {
+          var _rdData = _rdSheet.getRange(2, 1, _rdSheet.getLastRow() - 1, 2).getValues();
+          for (var _ri = _rdData.length - 1; _ri >= 0; _ri--) {
+            if (String(_rdData[_ri][0]).trim() === member.name &&
+                String(_rdData[_ri][1]).replace(/[^0-9]/g, '') === member.phone) {
+              _rdSheet.deleteRow(_ri + 2);
+              break;
+            }
+          }
+        }
+      } catch(_rde) { Logger.log('[processOneReminderMember] SHEET_RENEWAL 행 삭제 실패: ' + _rde); }
     }
     enqueueSMS(member.phone, member.name, _renewalMsg,
       member.isHoliday ? '연장예정(휴강)' : '연장예정', SMS_STATUS.WAITING);
@@ -3249,16 +3275,41 @@ function addSpecialNoticeRow() {
 
 
 // ──────────────────────────────────────────────
-// 52. 연장 예정 알림 토글 (관리자 전용)
-//     Admin.html 에서 호출. ScriptProperties 에 목록 저장.
+// 52. 전날 등록 안내 토글 (관리자 전용)
+//     Admin.html 에서 호출. 📋 전날 등록 안내 시트에 저장.
+//     시트 없으면 자동 생성.
 // ──────────────────────────────────────────────
 function setRenewalPending(name, phone, isOn) {
   try {
-    var props = PropertiesService.getScriptProperties();
-    var list  = JSON.parse(props.getProperty('RENEWAL_PENDING') || '[]');
-    list = list.filter(function(r){ return !(r.name === name && r.phone === phone); });
-    if (isOn) list.push({ name: name, phone: phone });
-    props.setProperty('RENEWAL_PENDING', JSON.stringify(list));
+    var ss    = SpreadsheetApp.openById(SS_ID);
+    var sheet = ss.getSheetByName(SHEET_RENEWAL);
+    if (!sheet) {
+      sheet = ss.insertSheet(SHEET_RENEWAL);
+      sheet.getRange(1, 1, 1, 3).setValues([['이름', '전화번호', '등록 시각']]);
+      sheet.getRange(1, 1, 1, 3).setFontWeight('bold').setBackground('#f5f5f5');
+      sheet.setFrozenRows(1);
+      sheet.setColumnWidth(1, 100);
+      sheet.setColumnWidth(2, 130);
+      sheet.setColumnWidth(3, 160);
+    }
+    // 기존 행 탐색
+    var lastRow = sheet.getLastRow();
+    var existRow = -1;
+    if (lastRow > 1) {
+      var data = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+      for (var i = 0; i < data.length; i++) {
+        if (String(data[i][0]).trim() === name &&
+            String(data[i][1]).replace(/[^0-9]/g, '') === phone.replace(/[^0-9]/g, '')) {
+          existRow = i + 2; // 1-indexed, header offset
+          break;
+        }
+      }
+    }
+    if (isOn) {
+      if (existRow === -1) sheet.appendRow([name, phone, new Date()]);
+    } else {
+      if (existRow !== -1) sheet.deleteRow(existRow);
+    }
     return true;
   } catch(ex) { Logger.log('[setRenewalPending] ' + ex); return false; }
 }
