@@ -859,12 +859,22 @@
     const pBox   = document.getElementById('pausedList');
     const attCnt = document.getElementById('attCount');
     const pauCnt = document.getElementById('pauseCount');
+
+    // snapshot for rollback
+    const snapOpacity  = itemDiv.style.opacity;
+    const snapDeco     = itemDiv.querySelector('.r-name')?.style.textDecoration || '';
+    const snapColor    = itemDiv.querySelector('.r-name')?.style.color || '';
+    const snapBg       = toggleElem.style.background;
+    const snapKnob     = toggleElem.querySelector('.toggle-knob').style.transform;
+    const snapParent   = isAdding ? attBox : pBox;
+
     if (isAdding) {
       itemDiv.style.opacity = '.55';
-      itemDiv.querySelector('.r-name').style.textDecoration = 'line-through';
-      itemDiv.querySelector('.r-name').style.color = 'var(--text-4)';
+      const rn = itemDiv.querySelector('.r-name'); if(rn){rn.style.textDecoration='line-through';rn.style.color='var(--text-4)';}
       toggleElem.style.background = 'var(--green)';
       toggleElem.querySelector('.toggle-knob').style.transform = 'translateX(18px)';
+      // clear empty state before moving
+      pBox.querySelector('.empty-state')?.remove();
       pBox.appendChild(itemDiv);
       const a = parseInt(attCnt.innerText); attCnt.innerText = Math.max(0,a-1) + ' 명';
       pauCnt.innerText = (parseInt(pauCnt.innerText) + 1) + ' 명';
@@ -873,20 +883,39 @@
       const rn = itemDiv.querySelector('.r-name'); if(rn){rn.style.textDecoration='';rn.style.color='';}
       toggleElem.style.background = '#E2DFD8';
       toggleElem.querySelector('.toggle-knob').style.transform = 'translateX(0)';
+      attBox.querySelector('.empty-state')?.remove();
       attBox.appendChild(itemDiv);
       const p = parseInt(pauCnt.innerText); pauCnt.innerText = Math.max(0,p-1) + ' 명';
       attCnt.innerText = (parseInt(attCnt.innerText) + 1) + ' 명';
     }
-    // fix onclick
     toggleElem.setAttribute('onclick', `togglePauseOptimistic('${key}',${isAdding},this)`);
+
+    function rollback() {
+      itemDiv.style.opacity = snapOpacity;
+      const rn = itemDiv.querySelector('.r-name'); if(rn){rn.style.textDecoration=snapDeco;rn.style.color=snapColor;}
+      toggleElem.style.background = snapBg;
+      toggleElem.querySelector('.toggle-knob').style.transform = snapKnob;
+      toggleElem.setAttribute('onclick', `togglePauseOptimistic('${key}',${currentlyPaused},this)`);
+      snapParent.appendChild(itemDiv);
+      // restore counts
+      if(isAdding){
+        const a=parseInt(attCnt.innerText); attCnt.innerText=(a+1)+' 명';
+        const p=parseInt(pauCnt.innerText); pauCnt.innerText=Math.max(0,p-1)+' 명';
+      } else {
+        const p=parseInt(pauCnt.innerText); pauCnt.innerText=(p+1)+' 명';
+        const a=parseInt(attCnt.innerText); attCnt.innerText=Math.max(0,a-1)+' 명';
+      }
+    }
+
     google.script.run
       .withSuccessHandler(function(res) {
-        if (!res || !res.success) { cache.dashboard=false; loadDashboard(); return; }
+        if (!res || !res.success) { rollback(); showCustomAlert('처리 중 오류가 발생했습니다.'); return; }
         cache.members=false; cache.dashboard=false;
         if (res.hasConflict && res.conflictDates && res.conflictDates.length>0) {
           showCustomAlert('⚠️ 날짜 충돌 감지\n\n밀려난 날짜가 다른 수강권과 겹칩니다:\n'+res.conflictDates.join(', ')+'\n\n회원 상세에서 확인해 주세요.');
         }
       })
+      .withFailureHandler(function() { rollback(); showCustomAlert('서버 오류가 발생했습니다.'); })
       .togglePauseAdmin(key, adminData.nextSaturday, isAdding);
   }
 
@@ -1275,35 +1304,65 @@
     document.getElementById('editModalSheet').classList.add('show');
   }
 
-  // 2-way seg handler (쉬어 / 홀딩 독립 토글)
+  // 2-way seg handler (쉬어 / 홀딩 독립 토글) — optimistic UI
   function setDateSeg(passKey, dateStr, seg, rowIdx) {
     const pkSafe = escapeHtml(passKey);
     const name  = document.getElementById('editMemberName').value;
     const phone = document.getElementById('editMemberPhone').value;
     const pauBtn = document.getElementById('seg_pau_'+pkSafe+'_'+rowIdx);
     const hldBtn = document.getElementById('seg_hld_'+pkSafe+'_'+rowIdx);
+    const drowEl = document.getElementById('drow_'+pkSafe+'_'+rowIdx);
+    const lblEl  = document.getElementById('dlbl_'+pkSafe+'_'+rowIdx);
 
     if(seg === 'pause') {
-      // 쉬어 버튼: 누르면 바로 쉬어가기 추가 (upcomingDates에서 빠지므로 항상 isAdding=true)
-      if(pauBtn) pauBtn.disabled = true;
+      // 즉각 피드백: 행 전체 흐리게 + 버튼 비활성
+      if(drowEl) { drowEl.style.opacity='0.35'; drowEl.style.pointerEvents='none'; }
       google.script.run
         .withSuccessHandler(function(res){
           if(res && res.success){
             if(res.hasConflict && res.conflictDates && res.conflictDates.length>0)
-              showCustomAlert('⚠️ 날짜 충돌\n'+res.conflictDates.join(', '));
+              showCustomAlert('⚠️ 날짜 충돌\n밀려난 날짜: '+res.conflictDates.join(', '));
             refreshDetail(name, phone);
-          } else { if(pauBtn) pauBtn.disabled=false; showCustomAlert('처리 오류'); }
+          } else {
+            if(drowEl) { drowEl.style.opacity=''; drowEl.style.pointerEvents=''; }
+            showCustomAlert('처리 중 오류가 발생했습니다.');
+          }
+        })
+        .withFailureHandler(function(){
+          if(drowEl) { drowEl.style.opacity=''; drowEl.style.pointerEvents=''; }
+          showCustomAlert('서버 오류가 발생했습니다.');
         })
         .togglePauseAdmin(passKey, dateStr, true);
 
     } else if(seg === 'hold') {
-      // 홀딩 버튼: 현재 active면 해제, 아니면 추가
       const wasH = hldBtn && hldBtn.classList.contains('active-hold');
-      if(hldBtn) hldBtn.disabled = true;
+      // 즉각 피드백: 버튼 상태 토글
+      if(hldBtn) {
+        hldBtn.disabled = true;
+        if(!wasH) { hldBtn.classList.add('active-hold'); if(lblEl) lblEl.classList.add('dim'); }
+        else       { hldBtn.classList.remove('active-hold'); if(lblEl) lblEl.classList.remove('dim'); }
+      }
       google.script.run
         .withSuccessHandler(function(res){
-          if(res && res.success) refreshDetail(name, phone);
-          else { if(hldBtn) hldBtn.disabled=false; showCustomAlert('처리 오류'); }
+          if(res && res.success) {
+            refreshDetail(name, phone);
+          } else {
+            // 롤백
+            if(hldBtn) {
+              hldBtn.disabled = false;
+              if(!wasH) { hldBtn.classList.remove('active-hold'); if(lblEl) lblEl.classList.remove('dim'); }
+              else       { hldBtn.classList.add('active-hold');    if(lblEl) lblEl.classList.add('dim'); }
+            }
+            showCustomAlert('처리 중 오류가 발생했습니다.');
+          }
+        })
+        .withFailureHandler(function(){
+          if(hldBtn) {
+            hldBtn.disabled = false;
+            if(!wasH) { hldBtn.classList.remove('active-hold'); if(lblEl) lblEl.classList.remove('dim'); }
+            else       { hldBtn.classList.add('active-hold');    if(lblEl) lblEl.classList.add('dim'); }
+          }
+          showCustomAlert('서버 오류가 발생했습니다.');
         })
         .toggleHoldingAdmin(passKey, dateStr, !wasH);
     }
@@ -1324,25 +1383,43 @@
       .getAdminMemberDetail(name, phone);
   }
 
-  // keep old specific-pause/hold for paused-list cancel buttons
   function toggleSpecificPause(btnElem, passKey, dateStr, isAdding) {
-    btnElem.disabled=true; btnElem.innerText=isAdding?'처리 중...':'취소 중...';
     const name=document.getElementById('editMemberName').value, phone=document.getElementById('editMemberPhone').value;
+    const rowEl = btnElem.closest('.date-row');
+    // 즉각 피드백: 행 흐리게
+    if(rowEl) { rowEl.style.opacity='0.35'; rowEl.style.pointerEvents='none'; }
     google.script.run
       .withSuccessHandler(function(res){
         if(res&&res.success){
-          if(res.hasConflict&&res.conflictDates&&res.conflictDates.length>0) showCustomAlert('⚠️ 날짜 충돌\n'+res.conflictDates.join(', '));
+          if(res.hasConflict&&res.conflictDates&&res.conflictDates.length>0) showCustomAlert('⚠️ 날짜 충돌\n밀려난 날짜: '+res.conflictDates.join(', '));
           refreshDetail(name,phone);
-        } else { btnElem.disabled=false; btnElem.innerText='오류'; }
+        } else {
+          if(rowEl) { rowEl.style.opacity=''; rowEl.style.pointerEvents=''; }
+          showCustomAlert('처리 중 오류가 발생했습니다.');
+        }
+      })
+      .withFailureHandler(function(){
+        if(rowEl) { rowEl.style.opacity=''; rowEl.style.pointerEvents=''; }
+        showCustomAlert('서버 오류가 발생했습니다.');
       })
       .togglePauseAdmin(passKey,dateStr,isAdding);
   }
+
   function toggleSpecificHolding(btnElem, passKey, dateStr, isAdding) {
-    btnElem.disabled=true; btnElem.innerText=isAdding?'처리 중...':'해제 중...';
     const name=document.getElementById('editMemberName').value, phone=document.getElementById('editMemberPhone').value;
+    const rowEl = btnElem.closest('.date-row');
+    if(rowEl) { rowEl.style.opacity='0.35'; rowEl.style.pointerEvents='none'; }
     google.script.run
       .withSuccessHandler(function(res){
-        if(res&&res.success) refreshDetail(name,phone); else { btnElem.disabled=false; btnElem.innerText='오류'; }
+        if(res&&res.success) refreshDetail(name,phone);
+        else {
+          if(rowEl) { rowEl.style.opacity=''; rowEl.style.pointerEvents=''; }
+          showCustomAlert('처리 중 오류가 발생했습니다.');
+        }
+      })
+      .withFailureHandler(function(){
+        if(rowEl) { rowEl.style.opacity=''; rowEl.style.pointerEvents=''; }
+        showCustomAlert('서버 오류가 발생했습니다.');
       })
       .toggleHoldingAdmin(passKey,dateStr,isAdding);
   }
