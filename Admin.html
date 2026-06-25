@@ -56,6 +56,7 @@
     @keyframes sheetUp  { from { transform:translateY(100%); } to { transform:translateY(0); } }
     @keyframes overlayIn{ from { opacity:0; } to { opacity:1; } }
     @keyframes toastIn  { from { opacity:0; transform:translate(-50%,10px); } to { opacity:1; transform:translate(-50%,0); } }
+    @keyframes skelPulse{ 0%,100%{opacity:1} 50%{opacity:.35} }
     @keyframes swipe    { 0%{transform:translateX(-100%)} 100%{transform:translateX(300%)} }
     @media (prefers-reduced-motion: reduce) {
       *,*::before,*::after { animation-duration:.01ms!important; transition-duration:.01ms!important; }
@@ -652,6 +653,22 @@
     document.getElementById('mainApp').style.display     = 'block';
     document.getElementById('bottomNav').style.display   = 'block';
     executeTabSwitch('dashboard');
+    // 로그인 직후 모든 탭 데이터 미리 로드 (탭 전환 즉시 렌더 위해)
+    setTimeout(_prefetchAllTabs, 1800);
+  }
+
+  function _prefetchAllTabs() {
+    if(!cache.members) {
+      google.script.run
+        .withSuccessHandler(function(data){ membersData=data; cache.members=true; })
+        .getAdminMembersList();
+    }
+    if(!cache.holiday) {
+      google.script.run
+        .withSuccessHandler(function(data){ holidayData=data; cache.holiday=true; })
+        .getInitialData();
+    }
+    // pending은 checkPendingBadgeSilently가 이미 처리
   }
 
   // ─── TAB SWITCH ───────────────────────────
@@ -691,7 +708,21 @@
   }
 
   function loadDashboard() {
-    if (cache.dashboard) renderDashboard();
+    if (cache.dashboard) {
+      renderDashboard();
+      // 캐시 있을 때: 로딩바 없이 백그라운드 갱신
+      if(!isSyncing) {
+        isSyncing = true;
+        google.script.run
+          .withSuccessHandler(function(data){
+            adminData=data; cache.dashboard=true; isSyncing=false;
+            renderDashboard(); checkPendingBadgeSilently();
+          })
+          .withFailureHandler(function(){ isSyncing=false; })
+          .getAdminDashboardData(weekOffset);
+      }
+      return;
+    }
     if (isSyncing) return;
     isSyncing = true; showTopLoading();
     google.script.run
@@ -936,28 +967,51 @@
   }
 
   function openMemberDetailFromDash(name, phone) {
-    // 이미 이 회원 데이터가 있으면 즉시 열기
     if (membersData.find(x => x.name===name && x.phone===phone)) {
       openMemberDetail(name, phone); return;
     }
-    // 전체 명단 대신 해당 회원 1명만 조회
-    showTopLoading();
+    // 데이터 없어도 시트 즉시 열기 (스켈레톤)
+    _openSheetSkeleton(name, phone);
     google.script.run
       .withSuccessHandler(function(memberData) {
-        hideTopLoading();
         if(memberData) {
           membersData = membersData.filter(x => !(x.name===memberData.name && x.phone===memberData.phone));
           membersData.push(memberData);
-        }
-        openMemberDetail(name, phone);
+          openMemberDetail(name, phone);
+        } else { closeModal(); showCustomAlert('회원 정보를 찾을 수 없습니다.'); }
       })
-      .withFailureHandler(function(){ hideTopLoading(); showCustomAlert('불러오기 오류가 발생했습니다.'); })
+      .withFailureHandler(function(){ closeModal(); showCustomAlert('불러오기 오류가 발생했습니다.'); })
       .getAdminMemberDetail(name, phone);
+  }
+
+  function _openSheetSkeleton(name, phone) {
+    const skel = (w, delay) =>
+      `<div style="height:14px;background:var(--line-2);border-radius:6px;width:${w};margin-bottom:8px;animation:skelPulse 1.2s ease-in-out ${delay} infinite"></div>`;
+    document.getElementById('editMemberName').value  = name;
+    document.getElementById('editMemberPhone').value = phone;
+    document.getElementById('editModalName').innerText  = name;
+    document.getElementById('editModalPhone').innerText = formatPhone(phone);
+    document.getElementById('editMemo').value = '';
+    document.getElementById('contactBtnsBox').innerHTML =
+      `<div style="height:46px;flex:1;background:var(--line-2);border-radius:13px;animation:skelPulse 1.2s ease-in-out infinite"></div>`+
+      `<div style="height:46px;flex:1;background:var(--line-2);border-radius:13px;margin-left:10px;animation:skelPulse 1.2s ease-in-out .15s infinite"></div>`;
+    document.getElementById('crmPassesBox').innerHTML =
+      `<div style="background:var(--card);border-radius:18px;padding:18px;margin-bottom:12px;">`+
+        skel('45%','0s')+skel('70%','.1s')+skel('55%','.2s')+
+      `</div>`;
+    document.getElementById('emergencyPanel').style.display = 'none';
+    document.getElementById('editToggleBtn').textContent = '⚙ 데이터 수동 수정';
+    document.getElementById('sheetBg').classList.add('show');
+    document.getElementById('editModalSheet').classList.add('show');
   }
 
   // ─── PENDING ──────────────────────────────
   function loadPending() {
-    if (cache.pending) renderPending();
+    if (cache.pending) {
+      renderPending();
+      document.getElementById('headerSub').innerText = pendingData.length>0?(pendingData.length+'건 확인 필요'):'대기 없음';
+      return;
+    }
     if (isSyncing) return;
     isSyncing = true; showTopLoading();
     google.script.run
