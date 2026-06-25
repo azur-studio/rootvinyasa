@@ -84,17 +84,15 @@
     .login-logo span { color:var(--surface); font-size:13px; font-weight:700; letter-spacing:.12em; }
     .login-title { font-size:20px; font-weight:700; letter-spacing:-.01em; }
     .login-sub { font-size:14px; color:var(--text-3); margin-top:5px; }
-    .pin-dots { display:flex; gap:16px; margin:38px 0 30px; }
-    .pin-dot { width:13px; height:13px; border-radius:50%; background:var(--line-2); transition:all .2s; }
-    .pin-dot.filled { background:var(--text); transform:scale(1.1); }
-    .pin-keypad { display:grid; grid-template-columns:repeat(3,72px); gap:14px; }
-    .key-btn { height:72px; display:flex; align-items:center; justify-content:center; border-radius:50%;
-               font-size:27px; font-weight:500; color:var(--text); background:var(--card); border:none;
-               box-shadow:0 1px 3px rgba(38,36,31,.08); transition:background .15s; user-select:none; }
-    .key-btn:active { background:var(--line); }
-    .key-btn.empty { background:transparent; box-shadow:none; pointer-events:none; }
-    .key-btn.backspace { font-size:20px; background:transparent; box-shadow:none; color:var(--text-3); }
-    .key-btn.backspace:active { background:var(--line); }
+    .pin-input { width:100%; max-width:220px; padding:14px 18px; border:1.5px solid var(--line-2); border-radius:14px;
+                 font-size:26px; font-weight:600; text-align:center; letter-spacing:.3em;
+                 background:var(--card); color:var(--text); margin:28px 0 16px; outline:none;
+                 transition:border-color .2s; font-family:inherit; }
+    .pin-input:focus { border-color:var(--green); }
+    .pin-submit { width:100%; max-width:220px; padding:14px; border-radius:14px; background:var(--text);
+                  color:var(--surface); font-size:16px; font-weight:600; border:none; transition:opacity .15s; font-family:inherit; }
+    .pin-submit:active { opacity:.85; }
+    .pin-submit:disabled { opacity:.5; cursor:wait; }
 
     /* ── APP SHELL ── */
     #mainApp { display:none; }
@@ -352,26 +350,10 @@
   <div class="login-logo"><span>R·V</span></div>
   <div class="login-title">루트 빈야사</div>
   <div class="login-sub">관리자 PIN 입력</div>
-  <div class="pin-dots" id="pinDots">
-    <div class="pin-dot" id="dot0"></div>
-    <div class="pin-dot" id="dot1"></div>
-    <div class="pin-dot" id="dot2"></div>
-    <div class="pin-dot" id="dot3"></div>
-  </div>
-  <div class="pin-keypad">
-    <button class="key-btn" onclick="pressKey('1')">1</button>
-    <button class="key-btn" onclick="pressKey('2')">2</button>
-    <button class="key-btn" onclick="pressKey('3')">3</button>
-    <button class="key-btn" onclick="pressKey('4')">4</button>
-    <button class="key-btn" onclick="pressKey('5')">5</button>
-    <button class="key-btn" onclick="pressKey('6')">6</button>
-    <button class="key-btn" onclick="pressKey('7')">7</button>
-    <button class="key-btn" onclick="pressKey('8')">8</button>
-    <button class="key-btn" onclick="pressKey('9')">9</button>
-    <button class="key-btn empty" disabled></button>
-    <button class="key-btn" onclick="pressKey('0')">0</button>
-    <button class="key-btn backspace" onclick="pressKey('⌫')">⌫</button>
-  </div>
+  <input type="password" id="pinInput" class="pin-input" inputmode="numeric"
+         placeholder="••••" autocomplete="current-password"
+         onkeydown="if(event.key==='Enter')submitPinFromInput()">
+  <button class="pin-submit" id="pinSubmitBtn" onclick="submitPinFromInput()">로그인</button>
 </div>
 
 <!-- ═══════════════ APP ═══════════════ -->
@@ -544,7 +526,6 @@
   let selectedHolidayType = '일반';
   let weekOffset      = 0;
   let satPickerState  = {};
-  let pinBuffer       = '';
   let toastTimer      = null;
 
   // ─── UTILS ───────────────────────────────
@@ -627,41 +608,29 @@
   function clearStoredToken() { try { localStorage.removeItem(AUTH_TOKEN_KEY); localStorage.removeItem('rootAuth'); } catch(e){} sessionAuth=false; }
   function persistToken(tok) { try { localStorage.setItem(AUTH_TOKEN_KEY,tok); } catch(e){} }
 
-  // ─── PIN KEYPAD ───────────────────────────
-  function updateDots() {
-    for (let i=0; i<4; i++) {
-      const d = document.getElementById('dot'+i);
-      if (d) d.classList.toggle('filled', i < pinBuffer.length);
-    }
-  }
-  function pressKey(k) {
-    if (k === '⌫') { pinBuffer = pinBuffer.slice(0,-1); updateDots(); return; }
-    if (pinBuffer.length >= 4) return;
-    pinBuffer += k;
-    updateDots();
-    if (pinBuffer.length === 4) {
-      setTimeout(() => submitPin(pinBuffer), 120);
-    }
-  }
-  function submitPin(pin) {
-    const keys = document.querySelectorAll('.key-btn');
-    keys.forEach(b => b.disabled = true);
+  // ─── PIN INPUT ────────────────────────────
+  function submitPinFromInput() {
+    const input = document.getElementById('pinInput');
+    const btn   = document.getElementById('pinSubmitBtn');
+    const pin   = input.value.trim();
+    if (!pin) { input.focus(); return; }
+    input.disabled = true; btn.disabled = true;
     google.script.run
       .withSuccessHandler(function(result) {
-        keys.forEach(b => b.disabled = false);
-        pinBuffer = ''; updateDots();
+        input.disabled = false; btn.disabled = false; input.value = '';
         if (result && result.token) {
           persistToken(result.token);
           sessionAuth = true;
           initApp();
         } else {
           showCustomAlert('PIN 번호가 일치하지 않습니다.');
+          input.focus();
         }
       })
       .withFailureHandler(function() {
-        keys.forEach(b => b.disabled = false);
-        pinBuffer = ''; updateDots();
+        input.disabled = false; btn.disabled = false; input.value = '';
         showCustomAlert('서버 통신 오류가 발생했습니다.<br>배포 버전을 확인해 주세요.');
+        input.focus();
       })
       .verifyAdminPin(pin);
   }
@@ -897,7 +866,6 @@
       toggleElem.style.background = 'var(--green)';
       toggleElem.querySelector('.toggle-knob').style.transform = 'translateX(18px)';
       pBox.appendChild(itemDiv);
-      attCnt.innerText = (parseInt(attCnt.innerText)+1-2)+1 + ' 명'; // simple dec
       const a = parseInt(attCnt.innerText); attCnt.innerText = Math.max(0,a-1) + ' 명';
       pauCnt.innerText = (parseInt(pauCnt.innerText) + 1) + ' 명';
     } else {
@@ -1224,18 +1192,21 @@
           pastCount++;
           pastRows+=`<div class="date-row"><span class="date-label past">${idx+1}회: ${escapeHtml(shortD)}</span></div>`;
         } else {
-          // 3-way segment (참석/쉬어/홀딩)
+          // 2-way segment (쉬어/홀딩)
           const canPause = !isUsed && p.totalWeeks!==1;
-          const seg3Html = (p.totalWeeks===1) ? '' : `
+          const isHeldDate = holdingHistory.includes(dateStr);
+          const seg2Html = (p.totalWeeks===1) ? '' : `
             <div class="seg3">
-              <button class="seg3-btn active-attend" id="seg_att_${pkSafe}_${idx}" onclick="setDateSeg('${pkAttr}','${dateAttr}','attend',${idx})">참석</button>
-              <button class="seg3-btn" id="seg_pau_${pkSafe}_${idx}" onclick="setDateSeg('${pkAttr}','${dateAttr}','pause',${idx})" ${canPause?'':'disabled style="opacity:.35;"'}>쉬어</button>
-              <button class="seg3-btn" id="seg_hld_${pkSafe}_${idx}" onclick="setDateSeg('${pkAttr}','${dateAttr}','hold',${idx})">홀딩</button>
+              <button class="seg3-btn${isHeldDate?'':''}" id="seg_pau_${pkSafe}_${idx}"
+                onclick="setDateSeg('${pkAttr}','${dateAttr}','pause',${idx})"
+                ${canPause?'':'disabled style="opacity:.35;"'}>쉬어</button>
+              <button class="seg3-btn${isHeldDate?' active-hold':''}" id="seg_hld_${pkSafe}_${idx}"
+                onclick="setDateSeg('${pkAttr}','${dateAttr}','hold',${idx})">홀딩</button>
             </div>`;
           futureRows+=`
             <div class="date-row" id="drow_${pkSafe}_${idx}">
-              <span class="date-label" id="dlbl_${pkSafe}_${idx}">${idx+1}회 · ${escapeHtml(shortD)} ${dupW}${conflW}</span>
-              ${seg3Html}
+              <span class="date-label${isHeldDate?' dim':''}" id="dlbl_${pkSafe}_${idx}">${idx+1}회 · ${escapeHtml(shortD)} ${dupW}${conflW}</span>
+              ${seg2Html}
             </div>`;
         }
       });
@@ -1304,53 +1275,37 @@
     document.getElementById('editModalSheet').classList.add('show');
   }
 
-  // 3-way seg handler — delegates to existing GAS calls
+  // 2-way seg handler (쉬어 / 홀딩 독립 토글)
   function setDateSeg(passKey, dateStr, seg, rowIdx) {
     const pkSafe = escapeHtml(passKey);
     const name  = document.getElementById('editMemberName').value;
     const phone = document.getElementById('editMemberPhone').value;
-    // determine current state by button classes
-    const attBtn = document.getElementById('seg_att_'+pkSafe+'_'+rowIdx);
     const pauBtn = document.getElementById('seg_pau_'+pkSafe+'_'+rowIdx);
     const hldBtn = document.getElementById('seg_hld_'+pkSafe+'_'+rowIdx);
-    const wasP = pauBtn && pauBtn.classList.contains('active-pause');
-    const wasH = hldBtn && hldBtn.classList.contains('active-hold');
 
-    // reset all
-    if(attBtn){attBtn.classList.remove('active-attend');attBtn.classList.add('active-attend');}
-    if(pauBtn){pauBtn.classList.remove('active-pause');}
-    if(hldBtn){hldBtn.classList.remove('active-hold');}
-    // apply active
-    if(seg==='attend'){attBtn&&(attBtn.classList.add('active-attend'),pauBtn&&pauBtn.classList.remove('active-attend'));}
-    else if(seg==='pause'){if(attBtn)attBtn.classList.remove('active-attend');pauBtn&&pauBtn.classList.add('active-pause');}
-    else if(seg==='hold'){if(attBtn)attBtn.classList.remove('active-attend');hldBtn&&hldBtn.classList.add('active-hold');}
+    if(seg === 'pause') {
+      // 쉬어 버튼: 누르면 바로 쉬어가기 추가 (upcomingDates에서 빠지므로 항상 isAdding=true)
+      if(pauBtn) pauBtn.disabled = true;
+      google.script.run
+        .withSuccessHandler(function(res){
+          if(res && res.success){
+            if(res.hasConflict && res.conflictDates && res.conflictDates.length>0)
+              showCustomAlert('⚠️ 날짜 충돌\n'+res.conflictDates.join(', '));
+            refreshDetail(name, phone);
+          } else { if(pauBtn) pauBtn.disabled=false; showCustomAlert('처리 오류'); }
+        })
+        .togglePauseAdmin(passKey, dateStr, true);
 
-    // update label dim
-    const lbl = document.getElementById('dlbl_'+pkSafe+'_'+rowIdx);
-    if(lbl){lbl.classList.toggle('dim', seg!=='attend');}
-
-    if(seg==='pause' && !wasP){
-      // add pause
-      const b = document.getElementById('seg_pau_'+pkSafe+'_'+rowIdx);
-      if(b){b.disabled=true;}
-      google.script.run.withSuccessHandler(function(res){
-        if(res&&res.success){
-          if(res.hasConflict&&res.conflictDates&&res.conflictDates.length>0) showCustomAlert('⚠️ 날짜 충돌\n'+res.conflictDates.join(', '));
-          refreshDetail(name,phone);
-        } else { showCustomAlert('처리 오류'); if(b)b.disabled=false; }
-      }).togglePauseAdmin(passKey, dateStr, true);
-    } else if(seg==='attend' && wasP){
-      google.script.run.withSuccessHandler(function(res){
-        if(res&&res.success) refreshDetail(name,phone); else showCustomAlert('처리 오류');
-      }).togglePauseAdmin(passKey, dateStr, false);
-    } else if(seg==='hold' && !wasH){
-      google.script.run.withSuccessHandler(function(res){
-        if(res&&res.success) refreshDetail(name,phone); else showCustomAlert('처리 오류');
-      }).toggleHoldingAdmin(passKey, dateStr, true);
-    } else if(seg==='attend' && wasH){
-      google.script.run.withSuccessHandler(function(res){
-        if(res&&res.success) refreshDetail(name,phone); else showCustomAlert('처리 오류');
-      }).toggleHoldingAdmin(passKey, dateStr, false);
+    } else if(seg === 'hold') {
+      // 홀딩 버튼: 현재 active면 해제, 아니면 추가
+      const wasH = hldBtn && hldBtn.classList.contains('active-hold');
+      if(hldBtn) hldBtn.disabled = true;
+      google.script.run
+        .withSuccessHandler(function(res){
+          if(res && res.success) refreshDetail(name, phone);
+          else { if(hldBtn) hldBtn.disabled=false; showCustomAlert('처리 오류'); }
+        })
+        .toggleHoldingAdmin(passKey, dateStr, !wasH);
     }
   }
 
