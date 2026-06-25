@@ -839,14 +839,30 @@
   }
 
   function handleOptionalAction(passKey, dateStr, isAdding, btnElem) {
-    btnElem.disabled = true; btnElem.innerText = '처리 중...';
+    const pkSafe = escapeHtml(passKey);
+    const rowEl  = document.getElementById('pot_'+pkSafe);
+    const cntEl  = document.getElementById('potentialCount');
+    // 즉각 피드백: 행 흐리게
+    if(rowEl) { rowEl.style.opacity='0.35'; rowEl.style.pointerEvents='none'; }
     google.script.run
       .withSuccessHandler(function(res) {
         if (res && res.success) {
-          cache.dashboard = false; cache.members = false;
-          loadDashboard();
+          if(rowEl) rowEl.remove();
+          const cur = parseInt(cntEl?.innerText)||0;
+          if(cntEl) cntEl.innerText = Math.max(0,cur-1)+'명';
           showToast(isAdding ? '참석이 확정되었습니다' : '참석이 취소되었습니다');
-        } else { btnElem.disabled=false; btnElem.innerText=isAdding?'참석 확정':'참석 취소'; showCustomAlert('처리 중 오류가 발생했습니다.'); }
+          cache.dashboard=false; cache.members=false;
+          loadDashboard();
+        } else {
+          if(rowEl) { rowEl.style.opacity=''; rowEl.style.pointerEvents=''; }
+          btnElem.disabled=false; btnElem.innerText=isAdding?'참석 확정':'참석 취소';
+          showCustomAlert('처리 중 오류가 발생했습니다.');
+        }
+      })
+      .withFailureHandler(function(){
+        if(rowEl) { rowEl.style.opacity=''; rowEl.style.pointerEvents=''; }
+        btnElem.disabled=false; btnElem.innerText=isAdding?'참석 확정':'참석 취소';
+        showCustomAlert('서버 오류가 발생했습니다.');
       })
       .toggleOptionalAttendee(passKey, dateStr, isAdding);
   }
@@ -920,12 +936,23 @@
   }
 
   function openMemberDetailFromDash(name, phone) {
-    if (membersData.length === 0 || !cache.members) {
-      showTopLoading();
-      google.script.run
-        .withSuccessHandler(function(data) { membersData=data; cache.members=true; hideTopLoading(); openMemberDetail(name,phone); })
-        .getAdminMembersList();
-    } else { openMemberDetail(name, phone); }
+    // 이미 이 회원 데이터가 있으면 즉시 열기
+    if (membersData.find(x => x.name===name && x.phone===phone)) {
+      openMemberDetail(name, phone); return;
+    }
+    // 전체 명단 대신 해당 회원 1명만 조회
+    showTopLoading();
+    google.script.run
+      .withSuccessHandler(function(memberData) {
+        hideTopLoading();
+        if(memberData) {
+          membersData = membersData.filter(x => !(x.name===memberData.name && x.phone===memberData.phone));
+          membersData.push(memberData);
+        }
+        openMemberDetail(name, phone);
+      })
+      .withFailureHandler(function(){ hideTopLoading(); showCustomAlert('불러오기 오류가 발생했습니다.'); })
+      .getAdminMemberDetail(name, phone);
   }
 
   // ─── PENDING ──────────────────────────────
@@ -1101,6 +1128,11 @@
     document.getElementById('typeBtnOptional').classList.toggle('active', type==='선택');
   }
   function loadHolidayList() {
+    if(cache.holiday) {
+      renderHolidayList();
+      document.getElementById('headerSub').innerText = (holidayData.holidays||[]).length+'개 등록됨';
+      return;
+    }
     showTopLoading();
     google.script.run
       .withSuccessHandler(function(data) {
@@ -1135,33 +1167,74 @@
     const dateVal=document.getElementById('newHolidayDate').value;
     const reason=document.getElementById('newHolidayReason').value.trim();
     if(!dateVal){showCustomAlert('날짜를 선택해 주세요.');return;}
-    showTopLoading();
+    const type = selectedHolidayType;
+    // 즉각 피드백: 로컬 데이터에 먼저 추가
+    if(!holidayData.holidays) holidayData.holidays=[];
+    if(!holidayData.holidays.includes(dateVal)){
+      holidayData.holidays.push(dateVal);
+      if(!holidayData.holidayTypes) holidayData.holidayTypes={};
+      holidayData.holidayTypes[dateVal]=type;
+      if(!holidayData.holidayReasons) holidayData.holidayReasons={};
+      holidayData.holidayReasons[dateVal]=reason;
+      renderHolidayList();
+      document.getElementById('headerSub').innerText=(holidayData.holidays.length)+'개 등록됨';
+    }
+    document.getElementById('newHolidayDate').value='';
+    document.getElementById('newHolidayReason').value='';
+    setHolidayType('일반');
     google.script.run
       .withSuccessHandler(function(res){
-        hideTopLoading();
         if(res){
-          document.getElementById('newHolidayDate').value='';
-          document.getElementById('newHolidayReason').value='';
-          setHolidayType('일반');
-          cache.dashboard=false; cache.holiday=false;
-          loadHolidayList();
           showToast('휴강이 추가되었습니다');
-        }else{showCustomAlert('추가 중 오류가 발생했습니다.');}
+          cache.dashboard=false;
+          // 백그라운드 재동기화
+          google.script.run.withSuccessHandler(function(fresh){
+            if(fresh){ holidayData=fresh; renderHolidayList();
+              document.getElementById('headerSub').innerText=(fresh.holidays||[]).length+'개 등록됨'; }
+          }).getInitialData();
+        } else {
+          // 롤백
+          holidayData.holidays=(holidayData.holidays||[]).filter(d=>d!==dateVal);
+          delete (holidayData.holidayTypes||{})[dateVal];
+          delete (holidayData.holidayReasons||{})[dateVal];
+          renderHolidayList();
+          document.getElementById('headerSub').innerText=(holidayData.holidays||[]).length+'개 등록됨';
+          showCustomAlert('추가 중 오류가 발생했습니다.');
+        }
       })
-      .withFailureHandler(function(){hideTopLoading();showCustomAlert('서버 오류가 발생했습니다.');})
-      .addHoliday(dateVal, reason, selectedHolidayType);
+      .withFailureHandler(function(){
+        holidayData.holidays=(holidayData.holidays||[]).filter(d=>d!==dateVal);
+        renderHolidayList();
+        showCustomAlert('서버 오류가 발생했습니다.');
+      })
+      .addHoliday(dateVal, reason, type);
   }
+
   function doRemoveHoliday(dateStr, btnElem) {
     showCustomConfirm(safeFormatDate(dateStr)+' 휴강을<br>삭제하시겠습니까?', function(agreed){
       if(!agreed)return;
-      btnElem.disabled=true; btnElem.innerText='삭제 중...'; showTopLoading();
+      // 즉각 피드백: 확인 즉시 목록에서 제거
+      const snapHolidays=[...(holidayData.holidays||[])];
+      const snapTypes={...(holidayData.holidayTypes||{})};
+      const snapReasons={...(holidayData.holidayReasons||{})};
+      holidayData.holidays=(holidayData.holidays||[]).filter(d=>d!==dateStr);
+      renderHolidayList();
+      document.getElementById('headerSub').innerText=(holidayData.holidays||[]).length+'개 등록됨';
       google.script.run
         .withSuccessHandler(function(res){
-          hideTopLoading();
-          if(res){cache.dashboard=false;cache.holiday=false;loadHolidayList();showToast('휴강이 삭제되었습니다');}
-          else{btnElem.disabled=false;btnElem.innerText='삭제';showCustomAlert('삭제 중 오류가 발생했습니다.');}
+          if(res){ cache.dashboard=false; showToast('휴강이 삭제되었습니다'); }
+          else {
+            holidayData.holidays=snapHolidays; holidayData.holidayTypes=snapTypes; holidayData.holidayReasons=snapReasons;
+            renderHolidayList();
+            document.getElementById('headerSub').innerText=snapHolidays.length+'개 등록됨';
+            showCustomAlert('삭제 중 오류가 발생했습니다.');
+          }
         })
-        .withFailureHandler(function(){hideTopLoading();btnElem.disabled=false;btnElem.innerText='삭제';})
+        .withFailureHandler(function(){
+          holidayData.holidays=snapHolidays; holidayData.holidayTypes=snapTypes; holidayData.holidayReasons=snapReasons;
+          renderHolidayList();
+          showCustomAlert('서버 오류가 발생했습니다.');
+        })
         .removeHoliday(dateStr);
     });
   }
@@ -1370,8 +1443,12 @@
 
   function refreshDetail(name, phone) {
     cache.dashboard=false; cache.members=false;
+    // 시트 바디 흐리게 — 서버 응답 기다리는 동안 멈춘 느낌 방지
+    const sheetBody = document.querySelector('#editModalSheet .sheet-body');
+    if(sheetBody) sheetBody.style.opacity='0.4';
     google.script.run
       .withSuccessHandler(function(memberData){
+        if(sheetBody) sheetBody.style.opacity='';
         if(memberData){
           const idx=membersData.findIndex(x=>x.name===memberData.name&&x.phone===memberData.phone);
           if(idx!==-1)membersData[idx]=memberData; else membersData.push(memberData);
@@ -1379,6 +1456,10 @@
         }
         checkAnomalies(); renderMembers();
         openMemberDetail(name, phone);
+      })
+      .withFailureHandler(function(){
+        if(sheetBody) sheetBody.style.opacity='';
+        showCustomAlert('데이터를 불러오는 중 오류가 발생했습니다.');
       })
       .getAdminMemberDetail(name, phone);
   }
