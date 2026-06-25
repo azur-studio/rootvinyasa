@@ -297,15 +297,27 @@
     .save-btn:disabled { opacity:.5; cursor:wait; }
 
     /* manual edit */
-    .edit-toggle-row { margin-top:18px; display:flex; align-items:center; justify-content:center; gap:6px; font-size:13px; font-weight:600; color:var(--text-4); cursor:pointer; padding:8px; background:none; border:none; width:100%; font-family:inherit; }
-    .edit-toggle-row:active { opacity:.7; }
-    .emergency-panel { background:#FBF3E0; border:1px solid #ECD9A8; border-radius:16px; padding:16px; margin-top:4px; display:none; }
+    .edit-toggle-row { margin-top:14px; display:flex; align-items:center; justify-content:center; gap:7px; font-size:13px; font-weight:700; color:var(--gold); cursor:pointer; padding:12px 16px; background:#FBF3E0; border:1.5px solid #ECD9A8; border-radius:13px; width:100%; font-family:inherit; }
+    .edit-toggle-row:active { opacity:.75; }
+    .emergency-panel { background:#FBF3E0; border:1px solid #ECD9A8; border-radius:16px; padding:16px; margin-top:6px; display:none; }
     .emergency-desc { font-size:12px; font-weight:600; color:var(--gold); line-height:1.5; margin-bottom:14px; }
     .em-field { margin-bottom:12px; }
     .em-label { font-size:12px; font-weight:700; color:var(--gold); margin-bottom:5px; display:block; }
     .em-input { width:100%; font-size:14px; padding:10px 12px; border:1px solid #ECD9A8; border-radius:10px; background:#FFFDF7; outline:none; font-family:inherit; color:var(--text); }
     .em-save-btn { width:100%; background:var(--gold); color:#fff; border:none; padding:12px; font-size:14px; font-weight:600; border-radius:10px; margin-top:4px; font-family:inherit; }
     .em-save-btn:active { opacity:.85; }
+    .em-add-pass-btn { width:100%; background:#fff; color:var(--gold); border:1.5px dashed #ECD9A8; padding:12px; font-size:14px; font-weight:600; border-radius:10px; margin-top:14px; font-family:inherit; cursor:pointer; }
+    .em-add-pass-btn:active { opacity:.75; }
+    .em-add-pass-form { background:#FFFDF7; border:1px solid #ECD9A8; border-radius:12px; padding:14px; margin-top:10px; display:none; }
+    /* 회원 정보 수정 */
+    .info-edit-btn { background:none; border:none; font-size:15px; color:var(--text-4); cursor:pointer; padding:2px 5px; line-height:1; }
+    .info-edit-input { font-size:15px; font-weight:600; padding:6px 10px; border:1.5px solid var(--line-2); border-radius:8px; background:var(--surface); color:var(--text); font-family:inherit; width:100%; margin-bottom:6px; outline:none; }
+    .info-action-row { display:flex; gap:8px; margin-top:4px; }
+    .info-save-btn { flex:1; background:var(--text); color:var(--surface); border:none; border-radius:10px; padding:10px; font-size:14px; font-weight:600; font-family:inherit; }
+    .info-cancel-btn { background:none; border:1px solid var(--line-2); border-radius:10px; padding:10px 16px; font-size:14px; font-weight:600; color:var(--text-3); font-family:inherit; }
+    /* 회원 삭제 */
+    .delete-member-btn { margin-top:10px; width:100%; background:none; border:1.5px solid #E57373; color:#E57373; border-radius:13px; padding:13px; font-size:14px; font-weight:700; font-family:inherit; cursor:pointer; }
+    .delete-member-btn:active { background:#FFEBEE; }
 
     /* sat picker */
     .sat-picker { border:1px solid #ECD9A8; border-radius:8px; background:#FFFDF5; padding:8px 10px; }
@@ -486,11 +498,24 @@
 <div class="sheet" id="editModalSheet">
   <div class="sheet-handle"><div class="sheet-handle-bar"></div></div>
   <div class="sheet-header">
-    <div>
-      <div class="sheet-name" id="editModalName"></div>
-      <div class="sheet-phone" id="editModalPhone"></div>
+    <div style="flex:1;min-width:0;">
+      <div id="memberInfoDisplay">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <div class="sheet-name" id="editModalName"></div>
+          <button class="info-edit-btn" onclick="startEditMemberInfo()" title="이름/번호 수정">✎</button>
+        </div>
+        <div class="sheet-phone" id="editModalPhone"></div>
+      </div>
+      <div id="memberInfoEdit" style="display:none;padding-top:4px;">
+        <input type="text" id="infoEditName" class="info-edit-input" placeholder="이름">
+        <input type="tel" id="infoEditPhone" class="info-edit-input" inputmode="numeric" placeholder="전화번호 (숫자만)">
+        <div class="info-action-row">
+          <button class="info-save-btn" onclick="saveMemberInfo()">저장</button>
+          <button class="info-cancel-btn" onclick="cancelEditMemberInfo()">취소</button>
+        </div>
+      </div>
     </div>
-    <button class="sheet-close" onclick="closeModal()">✕</button>
+    <button class="sheet-close" onclick="closeModal()" style="align-self:flex-start;">✕</button>
   </div>
   <div class="sheet-body">
     <input type="hidden" id="editMemberName">
@@ -509,7 +534,34 @@
     <div class="emergency-panel" id="emergencyPanel">
       <div class="emergency-desc">전산 오류 교정용입니다. 구분·금액·수업 날짜를 직접 고칠 수 있어요.</div>
       <div id="emergencyPassList"></div>
+      <button class="em-add-pass-btn" onclick="toggleAddPassForm()">＋ 수강권 직접 추가</button>
+      <div class="em-add-pass-form" id="addPassForm">
+        <div class="em-field"><label class="em-label">구분</label>
+          <select id="ap_type" class="em-input"><option>정규</option><option>연장</option><option>특정</option><option>특별</option><option>원데이</option><option>신규</option></select></div>
+        <div class="em-field"><label class="em-label">결제금액 (숫자만)</label>
+          <input type="number" id="ap_amount" class="em-input" value="0"></div>
+        <div class="em-field">
+          <label class="em-label">수강 일정 (토요일 선택)</label>
+          <div class="sat-picker" id="sp_ap_dates"><div class="sat-chips" id="schips_ap_dates"></div>
+            <div class="sat-cal-nav"><button onclick="satCalMove('ap_dates',-1)">◀ 이전</button><span id="scmon_ap_dates"></span><button onclick="satCalMove('ap_dates',1)">다음 ▶</button></div>
+            <div class="sat-cal-grid" id="scgrid_ap_dates"></div></div>
+          <input type="hidden" id="ap_dates" value=""></div>
+        <div class="em-field">
+          <label class="em-label">쉬어가기 날짜 (선택사항)</label>
+          <div class="sat-picker" id="sp_ap_pauses"><div class="sat-chips" id="schips_ap_pauses"></div>
+            <div class="sat-cal-nav"><button onclick="satCalMove('ap_pauses',-1)">◀ 이전</button><span id="scmon_ap_pauses"></span><button onclick="satCalMove('ap_pauses',1)">다음 ▶</button></div>
+            <div class="sat-cal-grid" id="scgrid_ap_pauses"></div></div>
+          <input type="hidden" id="ap_pauses" value=""></div>
+        <div class="em-field">
+          <label class="em-label">홀딩 날짜 (선택사항)</label>
+          <div class="sat-picker green" id="sp_ap_holding"><div class="sat-chips" id="schips_ap_holding"></div>
+            <div class="sat-cal-nav"><button onclick="satCalMove('ap_holding',-1)">◀ 이전</button><span id="scmon_ap_holding"></span><button onclick="satCalMove('ap_holding',1)">다음 ▶</button></div>
+            <div class="sat-cal-grid" id="scgrid_ap_holding"></div></div>
+          <input type="hidden" id="ap_holding" value=""></div>
+        <button class="em-save-btn" onclick="saveNewPass()">이 수강권 추가</button>
+      </div>
     </div>
+    <button class="delete-member-btn" id="deleteMemberBtn" onclick="confirmDeleteMember()">이 회원 삭제</button>
   </div>
 </div>
 
@@ -1031,7 +1083,10 @@
         skel('45%','0s')+skel('70%','.1s')+skel('55%','.2s')+
       `</div>`;
     document.getElementById('emergencyPanel').style.display = 'none';
+    document.getElementById('addPassForm').style.display = 'none';
     document.getElementById('editToggleBtn').textContent = '⚙ 데이터 수동 수정';
+    document.getElementById('memberInfoEdit').style.display    = 'none';
+    document.getElementById('memberInfoDisplay').style.display = '';
     document.getElementById('sheetBg').classList.add('show');
     document.getElementById('editModalSheet').classList.add('show');
   }
@@ -1346,7 +1401,10 @@
 
     emergencyMode = false;
     document.getElementById('emergencyPanel').style.display = 'none';
+    document.getElementById('addPassForm').style.display = 'none';
     document.getElementById('editToggleBtn').textContent = '⚙ 데이터 수동 수정';
+    document.getElementById('memberInfoEdit').style.display    = 'none';
+    document.getElementById('memberInfoDisplay').style.display = '';
 
     let allDates=[], dupDates=[];
     m.passes.forEach(p => p.upcomingDates.forEach(d => {
@@ -1635,6 +1693,118 @@
       })
       .withFailureHandler(function(){ showCustomAlert('서버 오류가 발생했습니다.'); })
       .setRenewalPending(name, phone, isOn);
+  }
+
+  // ─── 회원 이름/전화번호 수정 ─────────────────
+  function startEditMemberInfo() {
+    const name  = document.getElementById('editMemberName').value;
+    const phone = document.getElementById('editMemberPhone').value;
+    document.getElementById('infoEditName').value  = name;
+    document.getElementById('infoEditPhone').value = phone;
+    document.getElementById('memberInfoDisplay').style.display = 'none';
+    document.getElementById('memberInfoEdit').style.display    = 'block';
+  }
+  function cancelEditMemberInfo() {
+    document.getElementById('memberInfoEdit').style.display    = 'none';
+    document.getElementById('memberInfoDisplay').style.display = '';
+  }
+  function saveMemberInfo() {
+    const oldName  = document.getElementById('editMemberName').value;
+    const oldPhone = document.getElementById('editMemberPhone').value;
+    const newName  = document.getElementById('infoEditName').value.trim();
+    const newPhone = document.getElementById('infoEditPhone').value.replace(/[^0-9]/g,'');
+    if (!newName) { showCustomAlert('이름을 입력해주세요.'); return; }
+    if (!newPhone) { showCustomAlert('전화번호를 입력해주세요.'); return; }
+    document.querySelector('.info-save-btn').disabled = true;
+    google.script.run
+      .withSuccessHandler(function(ok) {
+        document.querySelector('.info-save-btn').disabled = false;
+        if (!ok) { showCustomAlert('저장 중 오류가 발생했습니다.'); return; }
+        // 로컬 즉시 반영
+        const m = _getMember(oldName, oldPhone);
+        if (m) { m.name = newName; m.phone = newPhone; _memberMap.delete(oldName+'_'+oldPhone); _memberMap.set(newName+'_'+newPhone, m); }
+        document.getElementById('editMemberName').value  = newName;
+        document.getElementById('editMemberPhone').value = newPhone;
+        document.getElementById('editModalName').innerText  = newName;
+        document.getElementById('editModalPhone').innerText = formatPhone(newPhone);
+        cancelEditMemberInfo();
+        cache.members = false; renderMembers();
+        showToast('회원 정보가 수정되었습니다');
+      })
+      .withFailureHandler(function() {
+        document.querySelector('.info-save-btn').disabled = false;
+        showCustomAlert('서버 오류가 발생했습니다.');
+      })
+      .adminUpdateMemberInfo(oldName, oldPhone, newName, newPhone);
+  }
+
+  // ─── 수강권 직접 추가 ─────────────────────────
+  function toggleAddPassForm() {
+    const form = document.getElementById('addPassForm');
+    const isHidden = form.style.display === 'none' || !form.style.display;
+    form.style.display = isHidden ? 'block' : 'none';
+    if (isHidden) {
+      initSatPicker('ap_dates',   '');
+      initSatPicker('ap_pauses',  '');
+      initSatPicker('ap_holding', '');
+    }
+  }
+  function saveNewPass() {
+    const name  = document.getElementById('editMemberName').value;
+    const phone = document.getElementById('editMemberPhone').value;
+    const type   = document.getElementById('ap_type').value;
+    const amount = document.getElementById('ap_amount').value;
+    const dates  = document.getElementById('ap_dates').value.trim();
+    const pauses = document.getElementById('ap_pauses').value.trim();
+    const holding= document.getElementById('ap_holding').value.trim();
+    const weeks  = dates ? dates.split(',').filter(Boolean).length : 1;
+    if (!dates) { showCustomAlert('수강 일정을 하나 이상 선택해주세요.'); return; }
+    const btn = document.querySelector('.em-add-pass-form .em-save-btn');
+    btn.disabled = true; btn.textContent = '추가 중...';
+    google.script.run
+      .withSuccessHandler(function(passKey) {
+        btn.disabled = false; btn.textContent = '이 수강권 추가';
+        if (!passKey) { showCustomAlert('추가 중 오류가 발생했습니다.'); return; }
+        document.getElementById('addPassForm').style.display = 'none';
+        cache.members = false;
+        google.script.run
+          .withSuccessHandler(function(memberData) {
+            if (memberData) { _setMember(memberData); _touchCache('members'); }
+            renderMembers(); checkAnomalies(); openMemberDetail(name, phone);
+          })
+          .getAdminMemberDetail(name, phone);
+        showToast('수강권이 추가되었습니다');
+      })
+      .withFailureHandler(function() {
+        btn.disabled = false; btn.textContent = '이 수강권 추가';
+        showCustomAlert('서버 오류가 발생했습니다.');
+      })
+      .adminAddPass(name, phone, type, amount, weeks, dates, pauses, holding);
+  }
+
+  // ─── 회원 삭제 ────────────────────────────────
+  function confirmDeleteMember() {
+    const name  = document.getElementById('editMemberName').value;
+    const phone = document.getElementById('editMemberPhone').value;
+    showCustomConfirm(
+      '⚠️ ' + name + ' 회원을 삭제하시겠습니까?<br>수강권 전체가 영구 삭제됩니다.',
+      function(agreed) {
+        if (!agreed) return;
+        showCustomConfirm('정말 삭제하시겠습니까?<br>복구가 불가능합니다.', function(agreed2) {
+          if (!agreed2) return;
+          google.script.run
+            .withSuccessHandler(function(ok) {
+              if (!ok) { showCustomAlert('삭제 중 오류가 발생했습니다.'); return; }
+              _memberMap.delete(name+'_'+phone);
+              membersData = membersData.filter(x => !(x.name===name && x.phone===phone));
+              cache.members = false; renderMembers(); closeModal();
+              showToast(name + ' 회원이 삭제되었습니다');
+            })
+            .withFailureHandler(function() { showCustomAlert('서버 오류가 발생했습니다.'); })
+            .adminDeleteMember(name, phone);
+        });
+      }
+    );
   }
 
   function saveMemberMemo() {

@@ -1401,6 +1401,64 @@ function emergencyEditPass(passKey, newType, newAmount, newDatesStr, newPausesSt
 
 
 // ──────────────────────────────────────────────
+// 23-B. 수강권 직접 추가 (관리자)
+// ──────────────────────────────────────────────
+function adminAddPass(name, phone, type, amount, totalWeeks, datesStr, pausesStr, holdingStr) {
+  try {
+    var ss = SpreadsheetApp.openById(SS_ID);
+    var dbSheet = ss.getSheetByName(SHEET_DB_NEW);
+    var dates = datesStr ? datesStr.split(',').map(function(s){return s.trim();}).filter(String) : [];
+    var startDate = dates.length > 0 ? dates[0] : formatDateSafe(new Date());
+    var weeks = Number(totalWeeks) || dates.length || 1;
+    var passKey = name + phone.slice(-4) + '_' + startDate.replace(/-/g,'').slice(4) + '_' + new Date().getTime().toString().slice(-4);
+    dbSheet.appendRow([passKey, name, "'" + phone, type, Number(amount), weeks,
+      datesStr ? "'" + datesStr : '', pausesStr || '', '', holdingStr || '']);
+    return passKey;
+  } catch(ex) { return false; }
+}
+
+// ──────────────────────────────────────────────
+// 23-C. 회원 이름/전화번호 수정 (관리자)
+// ──────────────────────────────────────────────
+function adminUpdateMemberInfo(oldName, oldPhone, newName, newPhone) {
+  try {
+    var ss = SpreadsheetApp.openById(SS_ID);
+    var dbSheet = ss.getSheetByName(SHEET_DB_NEW);
+    var data = dbSheet.getDataRange().getValues();
+    var updated = 0;
+    for (var i = 1; i < data.length; i++) {
+      var rowPhone = String(data[i][2]).replace(/[^0-9]/g, '');
+      if (String(data[i][1]) === oldName && rowPhone === oldPhone) {
+        if (newName !== oldName) dbSheet.getRange(i + 1, 2).setValue(newName);
+        if (newPhone !== oldPhone) dbSheet.getRange(i + 1, 3).setValue("'" + newPhone);
+        updated++;
+      }
+    }
+    return updated > 0;
+  } catch(ex) { return false; }
+}
+
+// ──────────────────────────────────────────────
+// 23-D. 회원 삭제 (관리자) — 전체 수강권 행 삭제
+// ──────────────────────────────────────────────
+function adminDeleteMember(name, phone) {
+  try {
+    var ss = SpreadsheetApp.openById(SS_ID);
+    var dbSheet = ss.getSheetByName(SHEET_DB_NEW);
+    var data = dbSheet.getDataRange().getValues();
+    var rowsToDelete = [];
+    for (var i = 1; i < data.length; i++) {
+      var rowPhone = String(data[i][2]).replace(/[^0-9]/g, '');
+      if (String(data[i][1]) === name && rowPhone === phone) rowsToDelete.push(i + 1);
+    }
+    for (var j = rowsToDelete.length - 1; j >= 0; j--) {
+      dbSheet.deleteRow(rowsToDelete[j]);
+    }
+    return rowsToDelete.length > 0;
+  } catch(ex) { return false; }
+}
+
+// ──────────────────────────────────────────────
 // 24. 회원 메모 저장 (관리자)
 //    ✅ [유지] [날짜 관리자]: 내용 형식 (V5.8 방식)
 // ──────────────────────────────────────────────
