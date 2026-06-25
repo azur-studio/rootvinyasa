@@ -1007,8 +1007,7 @@
     google.script.run
       .withSuccessHandler(function(memberData) {
         if(memberData) {
-          membersData = membersData.filter(x => !(x.name===memberData.name && x.phone===memberData.phone));
-          membersData.push(memberData);
+          _setMember(memberData);
           openMemberDetail(name, phone);
         } else { closeModal(); showCustomAlert('회원 정보를 찾을 수 없습니다.'); }
       })
