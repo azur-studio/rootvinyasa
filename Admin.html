@@ -522,6 +522,34 @@
   let currentSegment  = 'active';
   let cache           = { dashboard:false, pending:false, members:false, holiday:false };
   let isSyncing       = false;
+
+  // ── 스케일 대비 캐시 인프라 ──────────────────
+  // O(1) 회원 조회 맵 (membersData 배열 선형 검색 대체)
+  let _memberMap = new Map();
+
+  // TTL 기반 캐시 만료 (단위: ms)
+  const CACHE_TTL = { dashboard:90000, pending:45000, members:600000, holiday:600000 };
+  let   _cacheTime = { dashboard:0, pending:0, members:0, holiday:0 };
+
+  // 동일 엔드포인트 중복 호출 차단
+  let _inflight = {};
+
+  function _touchCache(key){ cache[key]=true; _cacheTime[key]=Date.now(); }
+  function _bustCache(key) { cache[key]=false; _cacheTime[key]=0; }
+  function _isFresh(key)   { return cache[key] && (Date.now()-_cacheTime[key])<CACHE_TTL[key]; }
+
+  function _getMember(name,phone){ return _memberMap.get(name+'::'+phone)||null; }
+  function _setMember(m){
+    const k=m.name+'::'+m.phone;
+    _memberMap.set(k,m);
+    const i=membersData.findIndex(x=>x.name===m.name&&x.phone===m.phone);
+    if(i!==-1) membersData[i]=m; else membersData.push(m);
+    if(membersData.length>500){ membersData=membersData.slice(-400); _rebuildMemberMap(); } // 메모리 캡
+  }
+  function _rebuildMemberMap(){ _memberMap.clear(); membersData.forEach(m=>_memberMap.set(m.name+'::'+m.phone,m)); }
+  function _startInflight(k){ _inflight[k]=true; }
+  function _endInflight(k)  { delete _inflight[k]; }
+  function _isInflight(k)   { return !!_inflight[k]; }
   let confirmCallback = null;
   let emergencyMode   = false;
   let selectedHolidayType = '일반';
@@ -658,14 +686,18 @@
   }
 
   function _prefetchAllTabs() {
-    if(!cache.members) {
+    if(!_isFresh('members') && !_isInflight('members')) {
+      _startInflight('members');
       google.script.run
-        .withSuccessHandler(function(data){ membersData=data; cache.members=true; })
+        .withSuccessHandler(function(data){ membersData=data; _rebuildMemberMap(); _touchCache('members'); _endInflight('members'); })
+        .withFailureHandler(function(){ _endInflight('members'); })
         .getAdminMembersList();
     }
-    if(!cache.holiday) {
+    if(!_isFresh('holiday') && !_isInflight('holiday')) {
+      _startInflight('holiday');
       google.script.run
-        .withSuccessHandler(function(data){ holidayData=data; cache.holiday=true; })
+        .withSuccessHandler(function(data){ holidayData=data; _touchCache('holiday'); _endInflight('holiday'); })
+        .withFailureHandler(function(){ _endInflight('holiday'); })
         .getInitialData();
     }
     // pending은 checkPendingBadgeSilently가 이미 처리
@@ -967,7 +999,7 @@
   }
 
   function openMemberDetailFromDash(name, phone) {
-    if (membersData.find(x => x.name===name && x.phone===phone)) {
+    if (_getMember(name, phone)) {
       openMemberDetail(name, phone); return;
     }
     // 데이터 없어도 시트 즉시 열기 (스켈레톤)
@@ -1074,16 +1106,17 @@
 
   // ─── MEMBERS ──────────────────────────────
   function loadMembers() {
-    if (cache.members) { renderMembers(); checkAnomalies(); return; }
-    if (isSyncing) return;
-    isSyncing = true; showTopLoading();
+    if (_isFresh('members')) { renderMembers(); checkAnomalies(); return; }
+    if (isSyncing || _isInflight('members')) return;
+    isSyncing = true; _startInflight('members'); showTopLoading();
     google.script.run
       .withSuccessHandler(function(data) {
-        membersData=data; cache.members=true; isSyncing=false; hideTopLoading();
+        membersData=data; _rebuildMemberMap(); _touchCache('members');
+        isSyncing=false; _endInflight('members'); hideTopLoading();
         document.getElementById('headerSub').innerText = '총 '+data.length+'명';
         renderMembers(); checkAnomalies();
       })
-      .withFailureHandler(function(){ isSyncing=false; hideTopLoading(); })
+      .withFailureHandler(function(){ isSyncing=false; _endInflight('members'); hideTopLoading(); })
       .getAdminMembersList();
   }
 
@@ -1107,29 +1140,32 @@
 
   function renderMembers() {
     const mBox = document.getElementById('memberList');
-    mBox.innerHTML = '';
-    let filtered = membersData.filter(m => {
-      let s = getMainStatus(m);
+    const filtered = membersData.filter(m => {
+      const s = getMainStatus(m);
       return currentSegment==='active' ? s!=='만료' : s==='만료';
     });
     if (filtered.length === 0) { mBox.innerHTML='<div class="empty-state">해당하는 회원이 없습니다.</div>'; return; }
+    const frag = document.createDocumentFragment();
     filtered.forEach(m => {
       const ms = getMainStatus(m);
       const sc = ms==='수강중'?'s-active':(ms==='수강예정'?'s-upcoming':'s-expired');
-      const anomHtml = m._hasAnomaly ? '<span class="dup-badge">⚠️ 확인 필요</span>' : '';
-      var nameAttr = escapeJsAttr(m.name), phoneAttr = escapeJsAttr(m.phone);
-      mBox.innerHTML += `
-        <div class="member-item member-list-item-wrap" onclick="openMemberDetail('${nameAttr}','${phoneAttr}')">
-          <div style="flex:1; min-width:0;">
-            <div style="display:flex; align-items:center; gap:7px;">
-              <span class="member-status ${sc}">${escapeHtml(ms)}</span>
-              <span class="member-name">${escapeHtml(m.name)} ${anomHtml}</span>
-            </div>
-            <div class="member-phone">${escapeHtml(formatPhone(m.phone))}</div>
+      const nameAttr = escapeJsAttr(m.name), phoneAttr = escapeJsAttr(m.phone);
+      const wrap = document.createElement('div');
+      wrap.className = 'member-item member-list-item-wrap';
+      wrap.setAttribute('onclick', "openMemberDetail('"+nameAttr+"','"+phoneAttr+"')");
+      wrap.innerHTML = `
+        <div style="flex:1; min-width:0;">
+          <div style="display:flex; align-items:center; gap:7px;">
+            <span class="member-status ${sc}">${escapeHtml(ms)}</span>
+            <span class="member-name">${escapeHtml(m.name)}${m._hasAnomaly?' <span class="dup-badge">⚠️ 확인 필요</span>':''}</span>
           </div>
-          <span class="member-chevron">›</span>
-        </div>`;
+          <div class="member-phone">${escapeHtml(formatPhone(m.phone))}</div>
+        </div>
+        <span class="member-chevron">›</span>`;
+      frag.appendChild(wrap);
     });
+    mBox.innerHTML = '';
+    mBox.appendChild(frag);
   }
 
   function getMainStatus(m) {
@@ -1295,7 +1331,7 @@
 
   // ─── MEMBER DETAIL ────────────────────────
   function openMemberDetail(name, phone) {
-    const m = membersData.find(x => x.name===name && x.phone===phone);
+    const m = _getMember(name, phone);
     if (!m) return;
 
     document.getElementById('editMemberName').value  = m.name;
@@ -1504,9 +1540,7 @@
       .withSuccessHandler(function(memberData){
         if(sheetBody) sheetBody.style.opacity='';
         if(memberData){
-          const idx=membersData.findIndex(x=>x.name===memberData.name&&x.phone===memberData.phone);
-          if(idx!==-1)membersData[idx]=memberData; else membersData.push(memberData);
-          cache.members=true;
+          _setMember(memberData); _touchCache('members');
         }
         checkAnomalies(); renderMembers();
         openMemberDetail(name, phone);
@@ -1596,7 +1630,7 @@
           if(row) row.classList.toggle('active',wasOn);
           showCustomAlert('오류가 발생했습니다. 다시 시도해 주세요.');
         } else {
-          const mem=membersData.find(x=>x.name===name&&x.phone===phone);
+          const mem=_getMember(name,phone);
           if(mem) mem.renewalPending=isOn;
         }
       })
@@ -1728,7 +1762,7 @@
             cache.members=false;
             google.script.run
               .withSuccessHandler(function(memberData){
-                if(memberData){const i=membersData.findIndex(x=>x.name===memberData.name&&x.phone===memberData.phone);if(i!==-1)membersData[i]=memberData;else membersData.push(memberData);cache.members=true;}
+                if(memberData){_setMember(memberData);_touchCache('members');}
                 checkAnomalies();renderMembers();openMemberDetail(name,phone);
               })
               .getAdminMemberDetail(name,phone);
