@@ -164,14 +164,15 @@ function rebuildAllMemberDates() {
     if (!data[i][1]) continue;
     var datesG = getSafeString(data[i][6]).split(',').map(function(s){return s.trim();}).filter(String);
     var datesH = getSafeString(data[i][7]).split(',').map(function(s){return s.trim();}).filter(String);
+    var datesJ = getSafeString(data[i][9]).split(',').map(function(s){return s.trim();}).filter(String);
     var totalWeeks = Number(data[i][5]);
     var originalStart = getOriginalStartDate(datesG, datesH);
     if (!originalStart || totalWeeks <= 0) continue;
     var attendedOpts = getAttendedOptionals(String(data[i][8] || ''));
-    // 자율참석으로 확정된 날짜는 제외 목록에서 빠짐 (수강일로 포함)
+    // 자율참석으로 확정된 날짜는 제외 목록에서 빠짐 (수강일로 포함), 홀딩도 제외
     var excludeList = holidays.all.filter(function(d) {
       return d !== originalStart && attendedOpts.indexOf(d) === -1;
-    }).concat(datesH);
+    }).concat(datesH).concat(datesJ);
     newDatesMap[i] = recalcDates(originalStart, totalWeeks, excludeList);
   }
     /* @LOGIC_BATCH_IO_OPTIMIZATION */
@@ -613,6 +614,7 @@ function setupSpreadsheetUI() {
     sheetDB.getRange('B2:F').setBackground('#FFFDE7');
     sheetDB.getRange('G2:H').setBackground('#F9F9F9').setNumberFormat('@');
     sheetDB.getRange('I2:I').setBackground('#FFFDE7');
+    sheetDB.getRange('J2:J').setBackground('#E8F5E9').setNumberFormat('@');
     sheetDB.getRange('E2:E').setNumberFormat('#,##0');
   }
 }
@@ -797,6 +799,7 @@ function getAdminDashboardData(weekOffset) {
     holidayType: isHol ? (holidayData.types[targetSatStr] || '') : '',
     attendees: [],
     paused: [],
+    held: [],
     potentialAttendees: []  // 선택 휴강일 때 참석 가능 회원
   };
 
@@ -805,6 +808,7 @@ function getAdminDashboardData(weekOffset) {
     if (!dbData[i][0]) continue;
     var datesG = getSafeString(dbData[i][6]).split(',').map(function(s){return s.trim();}).filter(String);
     var datesH = getSafeString(dbData[i][7]).split(',').map(function(s){return s.trim();}).filter(String);
+    var datesJ = getSafeString(dbData[i][9]).split(',').map(function(s){return s.trim();}).filter(String);
     var totalWeeks = Number(dbData[i][5]);
     var type = String(dbData[i][3]);
     var obj = {
@@ -820,6 +824,8 @@ function getAdminDashboardData(weekOffset) {
       res.attendees.push(obj);
     } else if (datesH.indexOf(targetSatStr) !== -1) {
       res.paused.push(obj);
+    } else if (datesJ.indexOf(targetSatStr) !== -1) {
+      res.held.push(obj);
     } else if (res.holidayType === '선택') {
       // 선택 휴강일 때: 수강 기간 중인 회원은 잠재 참석자로 분류
       if (datesG.length > 0 && parseSafeDate(datesG[0]) <= targetSat && parseSafeDate(datesG[datesG.length - 1]) >= targetSat) {
@@ -857,20 +863,99 @@ function togglePauseAdmin(passKey, saturdayDate, isAdding) {
         if (datesH.indexOf(saturdayDate) !== -1) return { success: false, reason: '이미 쉬어가기 처리된 날짜입니다.' };
         if (datesH.length >= maxPauses) return { success: false, reason: '쉬어가기 가능 횟수를 초과했습니다.' };
         datesH.push(saturdayDate);
+
+        // 기존 datesG에서 쉬어가기 날짜만 제거하고 끝에 연장 날짜 1개 추가
+        // (emergencyEditPass로 수동 수정된 날짜 배열을 보존하기 위해 전체 재계산 대신 증분 방식 사용)
+        var idxInG = datesG.indexOf(saturdayDate);
+        if (idxInG !== -1) datesG.splice(idxInG, 1);
+        var allExclude = holidayData.all.concat(datesH);
+        var lastD = datesG.length > 0
+          ? parseSafeDate(datesG[datesG.length - 1])
+          : parseSafeDate(saturdayDate);
+        var nextD = new Date(lastD.getTime());
+        nextD.setDate(nextD.getDate() + 7);
+        for (var it = 0; it < 104; it++) {
+          var ns = formatDateSafe(nextD);
+          if (allExclude.indexOf(ns) === -1 && datesG.indexOf(ns) === -1) { datesG.push(ns); break; }
+          nextD.setDate(nextD.getDate() + 7);
+        }
       } else {
         var idxH = datesH.indexOf(saturdayDate);
         if (idxH === -1) return { success: false, reason: '쉬어가기 목록에 없는 날짜입니다.' };
         datesH.splice(idxH, 1);
+
+        // 추가 시 붙인 연장 날짜(마지막)를 제거하고, 쉬어가기 날짜를 정렬 위치에 다시 삽입
+        if (datesG.length > 0) datesG.pop();
+        if (holidayData.all.indexOf(saturdayDate) === -1) {
+          var insertPos = datesG.length;
+          for (var k = 0; k < datesG.length; k++) {
+            if (datesG[k] > saturdayDate) { insertPos = k; break; }
+          }
+          datesG.splice(insertPos, 0, saturdayDate);
+        }
       }
 
-      var attendedOpts = getAttendedOptionals(String(data[i][8] || ''));
-      var excludeList = holidayData.all.filter(function(d) {
-        return d !== originalStart && attendedOpts.indexOf(d) === -1;
-      }).concat(datesH);
-      var newDatesG = recalcDates(originalStart, totalWeeks, excludeList);
-
-      dbSheet.getRange(i + 1, 7).setValue("'" + newDatesG.join(', '));
+      dbSheet.getRange(i + 1, 7).setValue("'" + datesG.join(', '));
       dbSheet.getRange(i + 1, 8).setValue(datesH.length > 0 ? "'" + datesH.join(', ') : '');
+      return { success: true };
+    }
+    return { success: false, reason: '패스를 찾을 수 없습니다.' };
+  } catch(ex) { return { success: false, reason: ex.toString() }; }
+}
+
+
+// ──────────────────────────────────────────────
+// 17b. 홀딩 토글 (관리자 재량 — 쉬어가기 한도 미차감)
+//     - 수강일 제외 + 말미 연장 (쉬어가기와 동일한 날짜 효과)
+//     - 횟수 제한 없음, J열(index 9)에 별도 저장
+// ──────────────────────────────────────────────
+function toggleHoldingAdmin(passKey, saturdayDate, isAdding) {
+  try {
+    var ss = SpreadsheetApp.openById(SS_ID);
+    var dbSheet = ss.getSheetByName(SHEET_DB_NEW);
+    var holidayData = loadHolidays(ss);
+    var data = dbSheet.getDataRange().getValues();
+
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][0]) !== String(passKey)) continue;
+      var datesG = getSafeString(data[i][6]).split(',').map(function(s){return s.trim();}).filter(String);
+      var datesH = getSafeString(data[i][7]).split(',').map(function(s){return s.trim();}).filter(String);
+      var datesJ = getSafeString(data[i][9]).split(',').map(function(s){return s.trim();}).filter(String);
+
+      if (isAdding) {
+        if (datesJ.indexOf(saturdayDate) !== -1) return { success: false, reason: '이미 홀딩된 날짜입니다.' };
+        datesJ.push(saturdayDate);
+        // datesG에서 홀딩 날짜 제거, 끝에 연장 날짜 추가
+        var idxInG = datesG.indexOf(saturdayDate);
+        if (idxInG !== -1) datesG.splice(idxInG, 1);
+        var allExclude = holidayData.all.concat(datesH).concat(datesJ);
+        var lastD = datesG.length > 0
+          ? parseSafeDate(datesG[datesG.length - 1])
+          : parseSafeDate(saturdayDate);
+        var nextD = new Date(lastD.getTime());
+        nextD.setDate(nextD.getDate() + 7);
+        for (var it = 0; it < 104; it++) {
+          var ns = formatDateSafe(nextD);
+          if (allExclude.indexOf(ns) === -1 && datesG.indexOf(ns) === -1) { datesG.push(ns); break; }
+          nextD.setDate(nextD.getDate() + 7);
+        }
+      } else {
+        var idxJ = datesJ.indexOf(saturdayDate);
+        if (idxJ === -1) return { success: false, reason: '홀딩 목록에 없는 날짜입니다.' };
+        datesJ.splice(idxJ, 1);
+        // 추가 시 붙인 연장 날짜(마지막) 제거, 홀딩 날짜 다시 삽입
+        if (datesG.length > 0) datesG.pop();
+        if (holidayData.all.indexOf(saturdayDate) === -1) {
+          var insertPos = datesG.length;
+          for (var k = 0; k < datesG.length; k++) {
+            if (datesG[k] > saturdayDate) { insertPos = k; break; }
+          }
+          datesG.splice(insertPos, 0, saturdayDate);
+        }
+      }
+
+      dbSheet.getRange(i + 1, 7).setValue("'" + datesG.join(', '));
+      dbSheet.getRange(i + 1, 10).setValue(datesJ.length > 0 ? "'" + datesJ.join(', ') : '');
       return { success: true };
     }
     return { success: false, reason: '패스를 찾을 수 없습니다.' };
@@ -905,12 +990,36 @@ function toggleOptionalAttendee(passKey, targetDate, isAdding) {
       }
 
       var attendedOpts = getAttendedOptionals(memo);
-      var excludeList = holidayData.all.filter(function(d) {
-        return d !== originalStart && attendedOpts.indexOf(d) === -1;
-      }).concat(datesH);
-      var newDatesG = recalcDates(originalStart, totalWeeks, excludeList);
 
-      dbSheet.getRange(i + 1, 7).setValue("'" + newDatesG.join(', '));
+      // emergencyEditPass로 수동 수정된 날짜 배열을 보존하기 위해 증분 방식 사용
+      if (isAdding) {
+        // 선택 휴강 참석: targetDate를 datesG 정렬 위치에 삽입, 마지막(연장) 날짜 제거
+        var insertPos = datesG.length;
+        for (var k = 0; k < datesG.length; k++) {
+          if (datesG[k] > targetDate) { insertPos = k; break; }
+        }
+        datesG.splice(insertPos, 0, targetDate);
+        if (datesG.length > 0) datesG.pop();
+      } else {
+        // 참석 취소: targetDate를 datesG에서 제거, 마지막 이후 유효한 날짜 1개 추가
+        var tIdx = datesG.indexOf(targetDate);
+        if (tIdx !== -1) datesG.splice(tIdx, 1);
+        var allExclude = holidayData.all.filter(function(d) {
+          return attendedOpts.indexOf(d) === -1;
+        }).concat(datesH);
+        var lastD = datesG.length > 0
+          ? parseSafeDate(datesG[datesG.length - 1])
+          : parseSafeDate(targetDate);
+        var nextD = new Date(lastD.getTime());
+        nextD.setDate(nextD.getDate() + 7);
+        for (var it = 0; it < 104; it++) {
+          var ns = formatDateSafe(nextD);
+          if (allExclude.indexOf(ns) === -1 && datesG.indexOf(ns) === -1) { datesG.push(ns); break; }
+          nextD.setDate(nextD.getDate() + 7);
+        }
+      }
+
+      dbSheet.getRange(i + 1, 7).setValue("'" + datesG.join(', '));
       dbSheet.getRange(i + 1, 9).setValue(memo);
       return { success: true };
     }
@@ -949,6 +1058,7 @@ function getAdminMembersList() {
       var type  = String(row[3]);
       var datesG = getSafeString(row[6]).split(',').map(function(s){return s.trim();}).filter(String);
       var datesH = getSafeString(row[7]).split(',').map(function(s){return s.trim();}).filter(String);
+      var datesJ = getSafeString(row[9]).split(',').map(function(s){return s.trim();}).filter(String);
       var totalWeeks = Number(row[5]);
 
       var status = '만료'; var remW = 0; var remD = 0;
@@ -985,7 +1095,8 @@ function getAdminMembersList() {
         remainingWeeks: remW,
         expiredDays: (status === '만료' && datesG.length > 0) ? Math.floor((today - parseSafeDate(datesG[datesG.length - 1])) / 86400000) : 0,
         upcomingDates: datesG,
-        pauseHistory: datesH
+        pauseHistory: datesH,
+        holdingHistory: datesJ
       };
       var mKey = String(row[1]) + '_' + phone;
       if (!membersMap[mKey]) membersMap[mKey] = { name: String(row[1]), phone: phone, memo: String(row[8] || ''), passes: [], renewalPending: !!_renewalSet[mKey] };
@@ -1270,7 +1381,7 @@ function getAdminMemberDetail(name, phone) {
 // ──────────────────────────────────────────────
 // 23. 수강권 긴급 수정 (관리자)
 // ──────────────────────────────────────────────
-function emergencyEditPass(passKey, newType, newAmount, newDatesStr, newPausesStr) {
+function emergencyEditPass(passKey, newType, newAmount, newDatesStr, newPausesStr, newHoldingStr) {
   try {
     var ss = SpreadsheetApp.openById(SS_ID);
     var dbSheet = ss.getSheetByName(SHEET_DB_NEW);
@@ -1281,6 +1392,7 @@ function emergencyEditPass(passKey, newType, newAmount, newDatesStr, newPausesSt
       dbSheet.getRange(i + 1, 5).setValue(newAmount);
       dbSheet.getRange(i + 1, 7).setValue("'" + newDatesStr);
       dbSheet.getRange(i + 1, 8).setValue(newPausesStr ? "'" + newPausesStr : '');
+      dbSheet.getRange(i + 1, 10).setValue(newHoldingStr ? "'" + newHoldingStr : '');
       return true;
     }
     return false;
@@ -2433,16 +2545,16 @@ function updateDBFormatting() {
 
       if (lastDate < today) {
         // 만료 — 연회색 + 글자 회색
-        dbSheet.getRange(row, 1, 1, 9).setBackground('#f5f5f5').setFontColor('#999999');
+        dbSheet.getRange(row, 1, 1, 10).setBackground('#f5f5f5').setFontColor('#999999');
       } else if (remaining <= 3 && remaining > 0) {
         // 임박 (3회 이하 남음) — 연노랑
-        dbSheet.getRange(row, 1, 1, 9).setBackground('#fff8e1').setFontColor(null);
+        dbSheet.getRange(row, 1, 1, 10).setBackground('#fff8e1').setFontColor(null);
       } else if (firstDate > today) {
         // 수강 예정 — 연파랑
-        dbSheet.getRange(row, 1, 1, 9).setBackground('#e3f2fd').setFontColor(null);
+        dbSheet.getRange(row, 1, 1, 10).setBackground('#e3f2fd').setFontColor(null);
       } else {
         // 수강 중 — 기본
-        dbSheet.getRange(row, 1, 1, 9).setBackground(null).setFontColor(null);
+        dbSheet.getRange(row, 1, 1, 10).setBackground(null).setFontColor(null);
       }
     }
   } catch(ex) { Logger.log('[updateDBFormatting] ' + ex); }

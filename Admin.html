@@ -71,6 +71,10 @@
     .lock-text { font-size: 11px; color: var(--red); font-weight: 600; background: #FFEBEA; padding: 2px 6px; border-radius: 4px; }
     #pausedList .list-item { background: #FAFAFC; }
     #pausedList .name { color: var(--text-light); text-decoration: line-through; }
+    #heldList .list-item { background: #F0FFF4; }
+    #heldList .name { color: #2E7D32; }
+    /* 홀딩 명단은 대시보드에서 숨김 */
+    #holdTitle, #heldList { display: none; }
     .empty-state { text-align: center; color: var(--text-light); font-size: 14px; padding: 40px 0; font-weight: 300; }
     .member-item, .pending-item { display: flex; justify-content: space-between; align-items: center; padding: 20px; border-bottom: 1px solid var(--line); background: var(--card); transition: 0.2s; }
     .member-item { cursor: pointer; }
@@ -103,6 +107,12 @@
     .schedule-date { font-size: 14px; font-weight: 500; color: var(--text); display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
     .schedule-date.past { color: #BBB; }
     .schedule-date.paused { color: #888; text-decoration: line-through; }
+    .schedule-date.held { color: #AAA; text-decoration: line-through; font-style: italic; }
+    .btn-mini-hold { background: none; border: none; padding: 4px 2px; font-size: 11px; font-weight: 500; color: #BBB; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+    .btn-mini-hold:active { color: #888; }
+    .btn-mini-hold.processing { color: #999; }
+    .btn-mini-hold-cancel { background: none; border: none; padding: 4px 2px; font-size: 11px; font-weight: 500; color: #AAA; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+    .btn-mini-hold-cancel:active { color: #888; }
     .btn-mini-pause { background: #F2F2F7; border: none; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; color: var(--text); cursor: pointer; transition: 0.2s; }
     .btn-mini-pause:active { background: #E5E5EA; }
     .btn-mini-pause:disabled { background: #E5E5EA; color: #888; cursor: wait; opacity: 0.7; display: none; }
@@ -264,6 +274,9 @@
 
         <div class="section-title" id="pauseTitle" style="margin-top:30px;"><span>쉬어가기 명단</span><span class="count-badge" id="pauseCount">- 명</span></div>
         <div class="list-card" id="pausedList"></div>
+
+        <div class="section-title" id="holdTitle" style="margin-top:30px;"><span>홀딩 명단</span><span class="count-badge" id="holdCount">- 명</span></div>
+        <div class="list-card" id="heldList"></div>
       </div>
     </div>
 
@@ -654,6 +667,28 @@
           </div>`;
       });
     }
+
+    // ── 홀딩 명단 ─────────────────────────────────
+    const hBox = document.getElementById('heldList');
+    hBox.innerHTML = '';
+    document.getElementById('holdCount').innerText = (adminData.held || []).length + ' 명';
+    if (!adminData.held || adminData.held.length === 0) {
+      hBox.innerHTML = '<div class="empty-state">홀딩 인원이 없습니다.</div>';
+    }
+    (adminData.held || []).forEach(m => {
+      var pkSafe = escapeHtml(m.passKey);
+      var pkAttr = escapeJsAttr(m.passKey);
+      var nameAttr = escapeJsAttr(m.name);
+      var phoneAttr = escapeJsAttr(m.phone);
+      hBox.innerHTML += `
+        <div class="list-item" id="item_${pkSafe}">
+          <div onclick="openMemberDetailFromDash('${nameAttr}', '${phoneAttr}')" style="cursor:pointer; flex:1; padding-right:15px;">
+            <div class="name">${escapeHtml(m.name)}</div>
+            <div class="exp">만료: ${escapeHtml(safeFormatDate(m.endDate))}</div>
+          </div>
+          <button class="btn-mini-hold-cancel" onclick="toggleHoldingOptimistic('${pkAttr}', true, this)">홀딩 해제</button>
+        </div>`;
+    });
   }
 
   // ✅ [V5.12] 선택 휴강 참석 확정/취소 — 보상 알림 없음
@@ -704,6 +739,35 @@
         } else { cache.dashboard = false; loadDashboard(); }
       })
       .togglePauseAdmin(key, adminData.nextSaturday, isAdding);
+  }
+
+  function toggleHoldingOptimistic(key, currentlyHeld, btnElem) {
+    btnElem.disabled = true;
+    const isAdding = !currentlyHeld;
+    const itemDiv  = document.getElementById(`item_${key}`);
+    const attBox   = document.getElementById('attendeeList');
+    const hBox     = document.getElementById('heldList');
+    const holdCount = document.getElementById('holdCount');
+    const attCount  = document.getElementById('attCount');
+    if (isAdding) {
+      // 참석 → 홀딩
+      hBox.appendChild(itemDiv);
+      holdCount.innerText = (parseInt(holdCount.innerText) + 1) + ' 명';
+      attCount.innerText  = (parseInt(attCount.innerText)  - 1) + ' 명';
+      // 버튼을 "홀딩 해제"로 교체
+      btnElem.outerHTML = `<button class="btn-mini-hold-cancel" id="item_${key}_hbtn" onclick="toggleHoldingOptimistic('${key}', true, this)">홀딩 해제</button>`;
+    } else {
+      // 홀딩 → 참석
+      attBox.appendChild(itemDiv);
+      holdCount.innerText = (parseInt(holdCount.innerText) - 1) + ' 명';
+      attCount.innerText  = (parseInt(attCount.innerText)  + 1) + ' 명';
+    }
+    google.script.run
+      .withSuccessHandler(function(res) {
+        cache.members = false; cache.dashboard = false;
+        loadDashboard();
+      })
+      .toggleHoldingAdmin(key, adminData.nextSaturday, isAdding);
   }
 
   function openMemberDetailFromDash(name, phone) {
@@ -1030,9 +1094,10 @@
     let today    = new Date(); today.setHours(0,0,0,0);
 
     m.passes.forEach(p => {
-      let pastRows = '', futureRows = '', pausedRows = '';
+      let pastRows = '', futureRows = '', pausedRows = '', holdingRows = '';
       let isUsed    = p.pauseHistory.length >= p.maxPauses;
       let isExpired = p.status === '만료';
+      let holdingHistory = p.holdingHistory || [];
       let typeBadge = `<span class="type-badge ${p.type === '특정' ? 'vip' : ''}">${escapeHtml(p.type)}</span>`;
       if (p.totalWeeks === 1) {
         let pCount = Math.max(1, p.amount / 35000);
@@ -1046,8 +1111,12 @@
         let shortDateStr = safeShortDate(dateStr);
         let isPast       = new Date(safeFormatDate(dateStr).split('/').join('-')) < today;
         var dateAttr     = escapeJsAttr(dateStr);
-        let btnHtml      = (isPast || p.totalWeeks === 1) ? ''
+        let pauseBtn = (isPast || p.totalWeeks === 1) ? ''
           : `<button class="btn-mini-pause" onclick="toggleSpecificPause(this,'${pkAttr}','${dateAttr}',true)" ${isUsed ? 'disabled' : ''}>쉬어가기</button>`;
+        let holdBtn = (isPast || p.totalWeeks === 1) ? ''
+          : `<button class="btn-mini-hold" onclick="toggleSpecificHolding(this,'${pkAttr}','${dateAttr}',true)">홀딩</button>`;
+        let btnHtml = pauseBtn || holdBtn
+          ? `<div style="display:flex;align-items:center;gap:6px;">${holdBtn}${pauseBtn}</div>` : '';
         let dupWarning   = duplicateDatesArray.includes(shortDateStr) ? `<span class="dup-badge">🚨 중복</span>` : '';
         let conflictWarn = '';
         m.passes.forEach(otherP => {
@@ -1073,6 +1142,15 @@
           </div>`;
       });
 
+      holdingHistory.forEach(dateStr => {
+        var dateAttr = escapeJsAttr(dateStr);
+        holdingRows += `
+          <div class="schedule-row">
+            <span class="schedule-date held">${escapeHtml(safeShortDate(dateStr))} (홀딩)</span>
+            <button class="btn-mini-hold-cancel" onclick="toggleSpecificHolding(this,'${pkAttr}','${dateAttr}',false)">해제</button>
+          </div>`;
+      });
+
       let bodyDisplay = isExpired ? 'none' : 'block';
       let toggleIcon  = isExpired ? '▸' : '▾';
 
@@ -1089,7 +1167,10 @@
             </div>
           </div>
           <div id="pass_body_${pkSafe}" style="display:${bodyDisplay};">
-            <div style="font-size:12px; margin:10px 0 8px; display:inline-block; background:#F2F2F7; padding:4px 8px; border-radius:6px; font-weight:600; color:#555;">쉬어가기: ${p.pauseHistory.length}/${p.maxPauses}</div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap; margin:10px 0 8px;">
+              <div style="font-size:12px; display:inline-block; background:#F2F2F7; padding:4px 8px; border-radius:6px; font-weight:600; color:#555;">쉬어가기: ${p.pauseHistory.length}/${p.maxPauses}</div>
+              ${holdingHistory.length > 0 ? `<div style="font-size:12px; display:inline-block; background:#E8F5E9; padding:4px 8px; border-radius:6px; font-weight:600; color:#2E7D32;">홀딩: ${holdingHistory.length}회</div>` : ''}
+            </div>
             ${pastCount > 0 ? `
             <div style="border-top:1px dashed var(--line); padding-top:10px; margin-top:4px;">
               <button class="past-dates-toggle-btn" id="past_btn_${pkSafe}" onclick="togglePastDates('${pkAttr}')">지난 수업 ${pastCount}회 ▸</button>
@@ -1101,6 +1182,7 @@
               ${futureRows}
             </div>` : (!isExpired ? '<div style="font-size:13px; color:#BBB; padding:10px 0;">남은 수업이 없습니다.</div>' : '')}
             ${pausedRows ? `<div class="schedule-wrap"><div style="font-size:12px; font-weight:700; margin-bottom:8px; color:var(--red);">[쉬어가기 처리된 일정]</div>${pausedRows}</div>` : ''}
+            ${holdingRows ? `<div class="schedule-wrap"><div style="font-size:12px; font-weight:700; margin-bottom:8px; color:#2E7D32;">[홀딩 처리된 일정]</div>${holdingRows}</div>` : ''}
           </div>
         ${(p.totalWeeks > 1 && ((p.status === '만료' && p.expiredDays <= 14) || (p.status === '수강중' && p.remainingWeeks === 1))) ? `
           <div class="renewal-toggle-row${m.renewalPending ? ' active' : ''}" id="renewal_row_${pkSafe}">
@@ -1147,6 +1229,32 @@
         } else { btnElem.innerText = '오류 발생'; btnElem.classList.remove('processing'); }
       })
       .togglePauseAdmin(passKey, dateStr, isAdding);
+  }
+
+  function toggleSpecificHolding(btnElem, passKey, dateStr, isAdding) {
+    btnElem.innerText = isAdding ? '처리 중...' : '해제 중...';
+    btnElem.classList.add('processing');
+    btnElem.disabled = true;
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (res && res.success) {
+          const name  = document.getElementById('editMemberName').value;
+          const phone = document.getElementById('editMemberPhone').value;
+          google.script.run
+            .withSuccessHandler(function(memberData) {
+              if (memberData) {
+                const idx = membersData.findIndex(x => x.name === memberData.name && x.phone === memberData.phone);
+                if (idx !== -1) membersData[idx] = memberData; else membersData.push(memberData);
+                cache.members = true;
+              }
+              cache.dashboard = false;
+              checkAnomalies(); renderMembers();
+              openMemberDetail(name, phone);
+            })
+            .getAdminMemberDetail(name, phone);
+        } else { btnElem.innerText = '오류 발생'; btnElem.classList.remove('processing'); }
+      })
+      .toggleHoldingAdmin(passKey, dateStr, isAdding);
   }
 
   function closeModal() {
@@ -1210,16 +1318,19 @@
     const container = document.getElementById('emergencyPassList');
     container.innerHTML = '';
     m.passes.forEach((p, pIdx) => {
-      const datesId  = 'em_dates_'  + p.passKey;
-      const pausesId = 'em_pauses_' + p.passKey;
+      const datesId   = 'em_dates_'   + p.passKey;
+      const pausesId  = 'em_pauses_'  + p.passKey;
+      const holdingId = 'em_holding_' + p.passKey;
       var pkSafe = escapeHtml(p.passKey);
       var pkAttr = escapeJsAttr(p.passKey);
       var nameAttr = escapeJsAttr(m.name);
       var phoneAttr = escapeJsAttr(m.phone);
-      var datesIdSafe = escapeHtml(datesId);
-      var pausesIdSafe = escapeHtml(pausesId);
-      var datesIdAttr = escapeJsAttr(datesId);
-      var pausesIdAttr = escapeJsAttr(pausesId);
+      var datesIdSafe   = escapeHtml(datesId);
+      var pausesIdSafe  = escapeHtml(pausesId);
+      var holdingIdSafe = escapeHtml(holdingId);
+      var datesIdAttr   = escapeJsAttr(datesId);
+      var pausesIdAttr  = escapeJsAttr(pausesId);
+      var holdingIdAttr = escapeJsAttr(holdingId);
       container.innerHTML += `
         <div style="border-top: 1px dashed #FFD166; padding-top: 12px; margin-top: 12px;">
           <div style="font-size: 12px; font-weight: 700; color: #856404; margin-bottom: 8px;">
@@ -1259,6 +1370,19 @@
             </div>
             <input type="hidden" id="${pausesIdSafe}" value="${escapeHtml(p.pauseHistory.join(', '))}">
           </div>
+          <div class="emergency-field-group">
+            <label>홀딩 날짜 (토요일 선택)</label>
+            <div class="sat-picker" id="sp_${holdingIdSafe}" style="border-color:#A5D6A7;">
+              <div class="sat-chips" id="schips_${holdingIdSafe}"></div>
+              <div class="sat-cal-nav">
+                <button onclick="satCalMove('${holdingIdAttr}', -1)">◀ 이전</button>
+                <span id="scmon_${holdingIdSafe}"></span>
+                <button onclick="satCalMove('${holdingIdAttr}', 1)">다음 ▶</button>
+              </div>
+              <div class="sat-cal-grid" id="scgrid_${holdingIdSafe}"></div>
+            </div>
+            <input type="hidden" id="${holdingIdSafe}" value="${escapeHtml((p.holdingHistory || []).join(', '))}">
+          </div>
           <button class="btn-emergency-save" onclick="saveEmergencyEdit('${pkAttr}', '${nameAttr}', '${phoneAttr}')">
             이 수강권 저장
           </button>
@@ -1266,8 +1390,9 @@
     });
     // init sat pickers after DOM is ready
     m.passes.forEach(p => {
-      initSatPicker('em_dates_'  + p.passKey, p.upcomingDates.join(', '));
-      initSatPicker('em_pauses_' + p.passKey, p.pauseHistory.join(', '));
+      initSatPicker('em_dates_'   + p.passKey, p.upcomingDates.join(', '));
+      initSatPicker('em_pauses_'  + p.passKey, p.pauseHistory.join(', '));
+      initSatPicker('em_holding_' + p.passKey, (p.holdingHistory || []).join(', '));
     });
   }
 
@@ -1345,17 +1470,19 @@
   }
 
   function saveEmergencyEdit(passKey, name, phone) {
-    const typeVal   = document.getElementById('em_type_' + passKey).value.trim();
-    const amountVal = Number(document.getElementById('em_amount_' + passKey).value);
-    const datesVal  = document.getElementById('em_dates_' + passKey).value;
-    const pausesVal = document.getElementById('em_pauses_' + passKey).value;
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    const datesArr  = datesVal.split(',').map(d => d.trim()).filter(Boolean);
-    const pausesArr = pausesVal.split(',').map(d => d.trim()).filter(Boolean);
+    const typeVal    = document.getElementById('em_type_' + passKey).value.trim();
+    const amountVal  = Number(document.getElementById('em_amount_' + passKey).value);
+    const datesVal   = document.getElementById('em_dates_'   + passKey).value;
+    const pausesVal  = document.getElementById('em_pauses_'  + passKey).value;
+    const holdingVal = document.getElementById('em_holding_' + passKey).value;
+    const dateRegex  = /^\d{4}-\d{2}-\d{2}$/;
+    const datesArr   = datesVal.split(',').map(d => d.trim()).filter(Boolean);
+    const pausesArr  = pausesVal.split(',').map(d => d.trim()).filter(Boolean);
+    const holdingArr = holdingVal.split(',').map(d => d.trim()).filter(Boolean);
     const validTypes = ['정규','연장','특정','원데이','신규','특별'];
     if (!validTypes.includes(typeVal)) { showCustomAlert('구분 값을 확인해 주세요.\n(정규 / 연장 / 특정 / 특별 / 원데이 / 신규)'); return; }
     if (isNaN(amountVal) || amountVal < 0) { showCustomAlert('금액을 올바르게 입력해 주세요.'); return; }
-    const badDate = [...datesArr, ...pausesArr].find(d => d && !dateRegex.test(d));
+    const badDate = [...datesArr, ...pausesArr, ...holdingArr].find(d => d && !dateRegex.test(d));
     if (badDate) { showCustomAlert(`날짜 형식 오류: "${badDate}"\nYYYY-MM-DD 형식으로 입력해 주세요.`); return; }
     showCustomConfirm(`[${name}] 수강권을 저장할까요?<br>저장 후 되돌릴 수 없습니다.`, function(agreed) {
       if (!agreed) return;
@@ -1379,7 +1506,7 @@
               .getAdminMemberDetail(name, phone);
           } else { showCustomAlert('저장 중 오류가 발생했습니다.'); }
         })
-        .emergencyEditPass(passKey, typeVal, amountVal, datesArr.join(', '), pausesArr.join(', '));
+        .emergencyEditPass(passKey, typeVal, amountVal, datesArr.join(', '), pausesArr.join(', '), holdingArr.join(', '));
     });
   }
 
