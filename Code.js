@@ -296,6 +296,14 @@ function submitApplication(payload) {
         if (!/^\d{4}-\d{2}-\d{2}$/.test(String(payload.dates[di]))) return false;
       }
     }
+    // ── 구조화된 전환/분류 필드 검증 (재설계: 서버가 옵션 문자열을 추측하지 않음) ──
+    var allowedPassTypes = ['정규', '연장', '특정', '원데이', ''];
+    payload.passTypeCode = allowedPassTypes.indexOf(String(payload.passTypeCode || '')) !== -1 ? String(payload.passTypeCode || '') : '';
+    var wc = Number(payload.weeksCode);
+    payload.weeksCode = (isFinite(wc) && wc > 0 && wc <= 12) ? wc : 0;
+    payload.isConversion = payload.isConversion === true;
+    var ockPassKey = String(payload.onedayCreditPassKey || '');
+    payload.onedayCreditPassKey = (ockPassKey.length > 0 && ockPassKey.length <= 60) ? ockPassKey : '';
   } catch (vErr) {
     return false;
   }
@@ -386,6 +394,15 @@ if (startDateCheck) {
     // 신규 신청 = 미확정(FALSE) → 연노랑
 logSheet.getRange(2, 1, 1, 9).setBackground('#fff9c4');
 
+    // ── 구조화된 전환/분류 필드 (N~Q열) — 결제확인 시 문자열 추측 대신 이 값을 그대로 사용
+    //    (J~K열은 verifyApplication의 검토상태/알림메시지 용도로 이미 예약되어 있어 피함) ──
+    logSheet.getRange(2, 14, 1, 4).setValues([[
+      payload.passTypeCode || '',
+      payload.weeksCode || 0,
+      !!payload.isConversion,
+      payload.onedayCreditPassKey || ''
+    ]]);
+
     return true;
     
   } catch(ex) {
@@ -409,8 +426,8 @@ function confirmPaymentAdmin(rowIdx) {
     var ss       = SpreadsheetApp.openById(SS_ID);
     var logSheet = ss.getSheetByName(SHEET_LOG);
     var dbSheet  = ss.getSheetByName(SHEET_DB_NEW);
-    var row = logSheet.getRange(rowIdx, 1, 1, 9).getValues()[0];
-    if (String(row[8] || '').trim()) return false;
+    var row = logSheet.getRange(rowIdx, 1, 1, 17).getValues()[0];
+    if (String(row[7] || '').trim()) return false;
 
     var name = String(row[1]);
     var phone = String(row[2]).replace(REGEX_NON_NUM, '');
@@ -418,28 +435,42 @@ function confirmPaymentAdmin(rowIdx) {
     var amount = Number(row[5]) || 0;
     var startDateStr = String(row[4]).split('~')[0].trim();
 
-    // 특정 회원 다회차(8회·12회) 및 구권(5회) 포함 주수 계산
-    var weeks = 4;
-    if (option.indexOf('12주') >= 0 || option.indexOf('12회') >= 0) weeks = 12;
-    else if (option.indexOf('8주') >= 0 || option.indexOf('8회') >= 0) weeks = 8;
-    else if (option.indexOf('5회') >= 0 || option.indexOf('5주') >= 0) weeks = 5;
-    else if (option.indexOf('원데이') >= 0) weeks = 1;
+    // ── 구조화된 필드(N~Q열) 우선 사용. 재설계 이전 로그(구버전)는 문자열 추측으로 폴백 ──
+    var passTypeCode = String(row[13] || '').trim();
+    var weeksCode = Number(row[14]) || 0;
+    var isConversion = row[15] === true;
+    var onedayCreditPassKey = String(row[16] || '').trim();
 
-    var classify = option.indexOf('연장') >= 0 ? '연장' : (option.indexOf('원데이') >= 0 ? '원데이' : '정규');
-    // 특정 회원이거나 옵션에 '특별'/'특정' 포함 시 classify = '특정'
+    var classify, weeks;
+    if (passTypeCode) {
+      classify = passTypeCode;
+      weeks = weeksCode || 4;
+    } else {
+      // ── 구버전 로그 호환 (재설계 이전 신청 건) ──
+      weeks = 4;
+      if (option.indexOf('12주') >= 0 || option.indexOf('12회') >= 0) weeks = 12;
+      else if (option.indexOf('8주') >= 0 || option.indexOf('8회') >= 0) weeks = 8;
+      else if (option.indexOf('5회') >= 0 || option.indexOf('5주') >= 0) weeks = 5;
+      else if (option.indexOf('원데이') >= 0) weeks = 1;
+      classify = option.indexOf('연장') >= 0 ? '연장' : (option.indexOf('원데이') >= 0 ? '원데이' : '정규');
+      isConversion = option.indexOf('원데이 할인') >= 0 && classify !== '원데이';
+    }
     if (option.indexOf('특별') >= 0 || option.indexOf('특정') >= 0) classify = '특정';
 
-    // ── 원데이 할인 처리 ────────────────────────────────────────────
-    // option에 '원데이 할인' 포함 시: 로그에서 14일 이내 확정 원데이 확인 후 차감
-    // weeks(쉬어가기 기준) = 원본 그대로 / weeksForDates(실제 날짜 수) = weeks - 1
+    // ── 원데이 전환 처리 (통합) ──────────────────────────────────────
+    // 원본 원데이 DB 행을 찾아 그 자리에서 정규/연장 패스로 승격 (별도 행 생성 X)
     var weeksForDates = weeks;
-    if (option.indexOf('원데이 할인') >= 0 && classify !== '원데이') {
-      var odDisc = _findRecentOnedayLog(ss, name, phone);
+    var mergeRowIndex = -1;
+    var dbData = dbSheet.getDataRange().getValues();
+
+    if (isConversion && classify !== '원데이') {
+      var odDisc = onedayCreditPassKey
+        ? _findOnedayLogByPassKey(ss, onedayCreditPassKey)
+        : _findRecentOnedayLog(ss, name, phone); // 구버전 폴백: 이름/전화로 최근 1건 추정
       if (odDisc.found && odDisc.perPersonPrice > 0) {
         amount = Math.max(0, amount - odDisc.perPersonPrice);
         weeksForDates = Math.max(1, weeks - 1);
-        Logger.log('[confirmPaymentAdmin] 원데이 할인 적용: -' + odDisc.perPersonPrice + '원, dates=' + weeksForDates + '회');
-        // 다인 원데이일 경우 강사에게 알림 (동반인 수동 처리 안내)
+        Logger.log('[confirmPaymentAdmin] 원데이 전환 적용: -' + odDisc.perPersonPrice + '원, dates=' + weeksForDates + '회');
         if (odDisc.isMultiPerson) {
           try {
             var instrPhone = PropertiesService.getScriptProperties().getProperty('INSTRUCTOR_PHONE');
@@ -450,11 +481,15 @@ function confirmPaymentAdmin(rowIdx) {
             }
           } catch(odAlertEx) { Logger.log('[confirmPaymentAdmin] 다인알림 실패: ' + odAlertEx); }
         }
+        if (odDisc.dbPassKey) {
+          for (var mi = 1; mi < dbData.length; mi++) {
+            if (String(dbData[mi][0]) === odDisc.dbPassKey) { mergeRowIndex = mi; break; }
+          }
+        }
       }
     }
     // ────────────────────────────────────────────────────────────────
     // 기존에 특정 회원이었던 경우 유지
-    var dbData = dbSheet.getDataRange().getValues();
     for (var k = 1; k < dbData.length; k++) {
       var rPhone = String(dbData[k][2]).replace(REGEX_NON_NUM, '');
       if (String(dbData[k][1]) === name && rPhone === phone && String(dbData[k][3]) === '특정') {
@@ -465,14 +500,27 @@ function confirmPaymentAdmin(rowIdx) {
 
     var holidayData = loadHolidays(ss);
     var excludeList = holidayData.all.filter(function(d) { return d !== startDateStr; });
-    var datesArray = recalcDates(startDateStr, weeksForDates, excludeList); // 원데이 할인 시 1회 적게
+    var datesArray = recalcDates(startDateStr, weeksForDates, excludeList); // 전환 시 1회 적게
     var datesString = datesArray.join(', ');
 
-    var passKey = name + phone.slice(-4) + '_' + startDateStr.split('-').join('').slice(4) + '_' + new Date().getTime().toString().slice(-4);
+    if (mergeRowIndex !== -1) {
+      // ── 통합: 기존 원데이 DB 행을 그 자리에서 정규/연장 패스로 승격 (passKey 유지) ──
+      var existingPassKey = String(dbData[mergeRowIndex][0]);
+      var mergedDates = getSafeString(dbData[mergeRowIndex][6]).split(',').map(function(s){return s.trim();}).filter(String);
+      var allDates = mergedDates.concat(datesArray);
+      dbSheet.getRange(mergeRowIndex + 1, 4).setValue(classify);
+      dbSheet.getRange(mergeRowIndex + 1, 5).setValue(amount);
+      dbSheet.getRange(mergeRowIndex + 1, 6).setValue(weeks);
+      dbSheet.getRange(mergeRowIndex + 1, 7).setValue("'" + allDates.join(', '));
+      logSheet.getRange(rowIdx, 8).setValue(true);
+      logSheet.getRange(rowIdx, 9).setValue(existingPassKey);
+      return true;
+    }
 
-// 교체 후 (2줄)
-dbSheet.insertRowAfter(1);
-var targetDBRange = dbSheet.getRange(2, 1, 1, 9);
+    // ── 병합 대상 없음 — 새 행 생성 (일반 등록, 구버전 폴백 등) ──
+    var passKey = name + phone.slice(-4) + '_' + startDateStr.split('-').join('').slice(4) + '_' + new Date().getTime().toString().slice(-4);
+    dbSheet.insertRowAfter(1);
+    var targetDBRange = dbSheet.getRange(2, 1, 1, 9);
     targetDBRange.setValues([[passKey, name, "'" + phone, classify, amount, weeks, "'" + datesString, '', row[6] || '']]);
     targetDBRange.setFontColor(null);
 
@@ -548,10 +596,41 @@ function _findRecentOnedayLog(ss, name, phone) {
         found: true,
         perPersonPrice: perPersonPrice,
         classDate: classDateStr,
-        isMultiPerson: persons >= 2
+        isMultiPerson: persons >= 2,
+        dbPassKey: String(row[8] || '')
       };
     }
   } catch(e) { Logger.log('[_findRecentOnedayLog] ' + e); }
+  return { found: false };
+}
+
+// ──────────────────────────────────────────────
+// 11-A-2. 원데이 로그 정확 조회 (passKey 기준)
+//   신규 방식 — 이름/전화 추정이 아닌, 클라이언트가 지정한 정확한 원데이 건을 조회
+// ──────────────────────────────────────────────
+function _findOnedayLogByPassKey(ss, passKey) {
+  try {
+    var logSheet = ss.getSheetByName(SHEET_LOG);
+    if (!logSheet) return { found: false };
+    var logData = logSheet.getDataRange().getValues();
+    for (var i = 1; i < logData.length; i++) {
+      var row = logData[i];
+      if (String(row[8] || '') !== passKey) continue;
+      var opt = String(row[3]);
+      var persons = 1;
+      var pm = opt.match(/(\d+)명/);
+      if (pm) persons = parseInt(pm[1]);
+      var logAmount = Number(row[5]) || 0;
+      var perPersonPrice = persons > 0 ? Math.round(logAmount / persons) : logAmount;
+      if (perPersonPrice <= 0) continue;
+      return {
+        found: true,
+        perPersonPrice: perPersonPrice,
+        isMultiPerson: persons >= 2,
+        dbPassKey: passKey
+      };
+    }
+  } catch(e) { Logger.log('[_findOnedayLogByPassKey] ' + e); }
   return { found: false };
 }
 
@@ -1175,6 +1254,10 @@ function getInitialData() {
 
       var uniqueKey = name + '_' + phone;
 
+      // 원데이가 아닌(실제 정규/연장/특정) 패스로 얻은 자격인지 구분
+      // → 원데이 방문만으로 얻은 자격("전환 대상")과 구분하기 위함
+      var realPassEligible = isEligible && classify !== '원데이';
+
       // 새 회원 등록 또는 기존 회원 데이터 최신화 (병합)
       if (!groupedMap[uniqueKey]) {
         groupedMap[uniqueKey] = {
@@ -1184,6 +1267,7 @@ function getInitialData() {
           expDate: expDateStr,
           status: status,
           isEligible: isEligible,
+          realPassEligible: realPassEligible,
           occupiedDates: datesG.slice()
         };
       } else {
@@ -1192,12 +1276,15 @@ function getInitialData() {
         datesG.forEach(function(d){ if (existing.occupiedDates.indexOf(d) === -1) existing.occupiedDates.push(d); });
         // 자격 및 만료일 업데이트
         if (isEligible) existing.isEligible = true;
+        if (realPassEligible) existing.realPassEligible = true;
         if (expDateStr > existing.expDate) existing.expDate = expDateStr;
         if (classify === '특정') existing.type = '특정';
       }
     }
 
-    // 1-B단계: 원데이 할인 가능 여부 조회 (14일 이내 확정 원데이)
+    // 1-B단계: 원데이 전환 가능 여부 조회 (14일 이내 확정 원데이)
+    //   count: 14일 이내 확정 원데이 방문 횟수 (1회=전환 대상 / 2회 이상=연장 취급)
+    //   passKey: 가장 최근 원데이 건의 DB passKey (전환 시 이 행을 그 자리에서 승격)
     var onedayDiscountMap = {};
     try {
       var odLog = ss.getSheetByName(SHEET_LOG);
@@ -1226,8 +1313,15 @@ function getInitialData() {
           var odPerPerson = odPersons > 0 ? Math.round(odAmt / odPersons) : odAmt;
           if (odPerPerson <= 0) continue;
           var odKey = odName + '_' + odPhone;
-          if (!onedayDiscountMap[odKey] || odDateStr > onedayDiscountMap[odKey].date) {
-            onedayDiscountMap[odKey] = { price: odPerPerson, date: odDateStr };
+          if (!onedayDiscountMap[odKey]) {
+            onedayDiscountMap[odKey] = { price: odPerPerson, date: odDateStr, passKey: String(odRow[8] || ''), count: 1 };
+          } else {
+            onedayDiscountMap[odKey].count++;
+            if (odDateStr > onedayDiscountMap[odKey].date) {
+              onedayDiscountMap[odKey].price = odPerPerson;
+              onedayDiscountMap[odKey].date = odDateStr;
+              onedayDiscountMap[odKey].passKey = String(odRow[8] || '');
+            }
           }
         }
       }
@@ -1268,8 +1362,11 @@ function getInitialData() {
         type: m.type,
         expDate: m.expDate,
         isEligible: m.isEligible,
+        realPassEligible: !!m.realPassEligible,   // 원데이가 아닌 실제 패스로 얻은 자격
         occupiedDates: m.occupiedDates,
-        onedayDiscount: odInfo ? odInfo.price : 0  // 1인당 원데이 할인 금액 (0=없음)
+        onedayDiscount: odInfo ? odInfo.price : 0,       // 1인당 원데이 할인 금액 (0=없음)
+        onedayVisitCount: odInfo ? odInfo.count : 0,     // 14일 이내 확정 원데이 방문 횟수
+        onedayCreditPassKey: odInfo ? odInfo.passKey : '' // 전환 시 승격할 원데이 DB 행의 passKey
       });
     });
 
@@ -1326,17 +1423,19 @@ function verifyCollisionMember(name, last4) {
         if (status === '수강중' || status === '수강예정' || (status === '만료' && diffDays <= 14)) isEligible = true;
         if (classify === '특정' && status === '만료' && diffDays > 14) classify = '정규';
       }
+      var realPassEligible = isEligible && classify !== '원데이';
       var uniqueKey = rName + '_' + rPhone;
       if (!found[uniqueKey]) {
         found[uniqueKey] = {
           name: rName, phone: rPhone, type: classify, expDate: expDateStr,
-          status: status, isEligible: isEligible,
+          status: status, isEligible: isEligible, realPassEligible: realPassEligible,
           occupiedDates: datesG.slice()
         };
       } else {
         var e = found[uniqueKey];
         datesG.forEach(function(d){ if (e.occupiedDates.indexOf(d) === -1) e.occupiedDates.push(d); });
         if (isEligible) e.isEligible = true;
+        if (realPassEligible) e.realPassEligible = true;
         if (expDateStr > e.expDate) e.expDate = expDateStr;
         if (classify === '특정') e.type = '특정';
       }
@@ -1350,6 +1449,43 @@ function verifyCollisionMember(name, last4) {
       return null;
     }
     var m = found[keys[0]];
+
+    // 원데이 전환 정보 조회 (getInitialData 와 동일 로직 — 동명이인 충돌 경로도 동일하게 지원)
+    var odInfo = { price: 0, count: 0, passKey: '' };
+    try {
+      var logSheet = ss.getSheetByName(SHEET_LOG);
+      if (logSheet) {
+        var logData = logSheet.getDataRange().getValues();
+        for (var li = 1; li < logData.length; li++) {
+          var lRow = logData[li];
+          if (lRow[7] !== true) continue;
+          var lOpt = String(lRow[3]);
+          if (lOpt.indexOf('원데이') === -1) continue;
+          if (String(lRow[1]).trim() !== m.name) continue;
+          if (String(lRow[2]).replace(REGEX_NON_NUM, '') !== m.phone) continue;
+          var lDateStr = String(lRow[4] || '').split('~')[0].trim();
+          var lDate = parseSafeDate(lDateStr);
+          if (!lDate) continue;
+          lDate.setHours(0, 0, 0, 0);
+          if (lDate > today) continue;
+          var lDiff = Math.floor((today - lDate) / 86400000);
+          if (lDiff > 14) continue;
+          var lPersons = 1;
+          var lPm = lOpt.match(/(\d+)명/);
+          if (lPm) lPersons = parseInt(lPm[1]);
+          var lAmt = Number(lRow[5]) || 0;
+          var lPerPerson = lPersons > 0 ? Math.round(lAmt / lPersons) : lAmt;
+          if (lPerPerson <= 0) continue;
+          odInfo.count++;
+          if (lDateStr > (odInfo.date || '')) {
+            odInfo.price = lPerPerson;
+            odInfo.date = lDateStr;
+            odInfo.passKey = String(lRow[8] || '');
+          }
+        }
+      }
+    } catch(odEx) { Logger.log('[verifyCollisionMember onedayDiscount] ' + odEx); }
+
     return {
       name: m.name,
       phoneMask: last4,        // 사용자가 직접 입력한 값을 그대로 반환
@@ -1357,7 +1493,11 @@ function verifyCollisionMember(name, last4) {
       type: m.type,
       expDate: m.expDate,
       isEligible: m.isEligible,
-      occupiedDates: m.occupiedDates
+      realPassEligible: !!m.realPassEligible,
+      occupiedDates: m.occupiedDates,
+      onedayDiscount: odInfo.price,
+      onedayVisitCount: odInfo.count,
+      onedayCreditPassKey: odInfo.passKey
     };
   } catch(ex) {
     Logger.log('[verifyCollisionMember] ' + ex);

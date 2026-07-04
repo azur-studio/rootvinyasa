@@ -1767,7 +1767,8 @@
     passType:'정규', option:'', amount:0, persons:1,
     startDate:'', endDate:'', weeksToCalc:0, memo:'',
     onedayDiscount:0, onedayApplied:false, originalWeeks:0,
-    sessionText:'', occupiedDates:[], expDate:''
+    sessionText:'', occupiedDates:[], expDate:'',
+    realPassEligible:false, onedayVisitCount:0, onedayCreditPassKey:''
   };
   var holidaysList=[], holidayReasons={}, holidayTypes={}, memberDB=[];
 
@@ -2363,8 +2364,18 @@
     appData.name = m.name; appData.phoneMask = m.phoneMask;
     appData.isNew = false; appData.expDate = m.expDate || '';
     appData.onedayDiscount = m.onedayDiscount || 0;  // 원데이 할인 금액 (0=없음)
+    appData.onedayVisitCount = m.onedayVisitCount || 0;
+    appData.onedayCreditPassKey = m.onedayCreditPassKey || '';
+    appData.realPassEligible = !!m.realPassEligible;
+    /* 자격 판정 —
+       특정: 특정 회원 고정
+       연장: 실제 정규/연장 패스로 얻은 자격, 또는 원데이 2회 이상(재방문 신호)
+       전환: 원데이 딱 1회만 다녀와 아직 정식 패스가 없는 상태 — 정규가 기준으로 전환
+       정규: 그 외(신규/자격 없음) */
     if (m.type === '특정') appData.passType = '특정';
-    else if (m.isEligible) appData.passType = '연장';
+    else if (m.realPassEligible) appData.passType = '연장';
+    else if (m.isEligible && appData.onedayVisitCount >= 2) appData.passType = '연장';
+    else if (m.isEligible && appData.onedayVisitCount === 1) appData.passType = '전환';
     else appData.passType = '정규';
     if (memberChanged) {
       appData.fullPhone = '';
@@ -2487,6 +2498,7 @@
       if (appData.isNew) { h.innerHTML='어떻게 시작해볼까요'; }
       else if (appData.passType==='특정') { h.innerHTML=escapeHtml(appData.name)+'님께 드리는 패스'; }
       else if (appData.passType==='연장') { h.innerHTML=escapeHtml(appData.name)+'님 · 이어가기'; }
+      else if (appData.passType==='전환') { h.innerHTML=escapeHtml(appData.name)+'님 · 이어서 시작하기'; }
       else { h.innerHTML=escapeHtml(appData.name)+'님 · 다시 한 번'; }
     }
     var passStepH = document.getElementById('passStepHeading');
@@ -2514,8 +2526,9 @@
             '<div class="opt-price">270,000원<span class="discount-badge">-30,000원</span></div></button>'+
         '</div>';
 
-    } else if (appData.passType==='연장' && od > 0) {
-      // 연장 + 원데이 할인 동시 적용
+    } else if (appData.passType==='연장' && appData.realPassEligible && od > 0) {
+      // 이미 실제 정규/연장 패스가 있는 회원이 보너스로 원데이도 다녀간 경우
+      // — 연장가 기준으로 그 원데이 크레딧까지 받을 수 있게 함 (버려지지 않도록)
       box.innerHTML=
         '<p class="pass-section-label">원데이 할인</p>'+
         '<button class="btn-option" onclick="selectOptionOD(\'원데이 할인 한 달 (4주)\',110000,4,'+od+')">'+
@@ -2532,6 +2545,26 @@
           '<button class="btn-option" onclick="selectOptionOD(\'원데이 할인 세 달 (12주)\',300000,12,'+od+')">'+
             '<div><div class="opt-title">세 달 (11회)</div></div>'+
             '<div class="opt-price">'+(300000-od).toLocaleString()+'원<span class="discount-badge">-'+odS+'원</span></div></button>'+
+        '</div>';
+
+    } else if (appData.passType==='전환' && od > 0) {
+      // 원데이 딱 1회만 다녀와 전환하는 경우 — 정규가 기준, 연장 할인 없이 원데이 크레딧만 차감
+      box.innerHTML=
+        '<p class="pass-section-label">원데이 전환</p>'+
+        '<button class="btn-option" onclick="selectOptionOD(\'원데이 전환 한 달 (4주)\',120000,4,'+od+')">'+
+          '<div><div class="opt-title">한 달 시작하기 (3회)</div></div>'+
+          '<div class="opt-price">'+(120000-od).toLocaleString()+'원<span class="discount-badge">-'+odS+'원</span></div></button>'+
+        '<button class="btn-option" onclick="selectOption(\'원데이 클래스\',35000,1)">'+
+          '<div><div class="opt-title">원데이 클래스 (1회)</div></div>'+
+          '<div class="opt-price">35,000원</div></button>'+
+        '<button class="pass-more-toggle" onclick="togglePassMore(this)"><span>＋ 다른 기간 더보기</span><span>＋</span></button>'+
+        '<div class="pass-more-section">'+
+          '<button class="btn-option" onclick="selectOptionOD(\'원데이 전환 두 달 (8주)\',230000,8,'+od+')">'+
+            '<div><div class="opt-title">두 달 (7회)</div></div>'+
+            '<div class="opt-price">'+(230000-od).toLocaleString()+'원<span class="discount-badge">-'+odS+'원</span></div></button>'+
+          '<button class="btn-option" onclick="selectOptionOD(\'원데이 전환 세 달 (12주)\',330000,12,'+od+')">'+
+            '<div><div class="opt-title">세 달 (11회)</div></div>'+
+            '<div class="opt-price">'+(330000-od).toLocaleString()+'원<span class="discount-badge">-'+odS+'원</span></div></button>'+
         '</div>';
 
     } else if (appData.passType==='연장') {
@@ -2970,7 +3003,16 @@
     var _timeout = setTimeout(function() {
       if (!_submitted) { _submitted=true; btn.disabled=false; btn.innerText='신청 완료하기'; showCustomAlert('일시적인 오류가 발생했습니다.\n잠시 후 다시 시도해 주세요.'); }
     }, 10000);
-    callGAS('submitApplication', [{ isNew:appData.isNew, name:appData.name, fullPhone:appData.fullPhone, phoneMask:appData.phoneMask, option:appData.option, startDate:appData.startDate, endDate:appData.endDate, amount:appData.amount, memo:appData.memo }])
+    callGAS('submitApplication', [{
+      isNew:appData.isNew, name:appData.name, fullPhone:appData.fullPhone, phoneMask:appData.phoneMask,
+      option:appData.option, startDate:appData.startDate, endDate:appData.endDate, amount:appData.amount, memo:appData.memo,
+      /* 구조화된 전환/분류 필드 — 서버가 option 문자열을 추측하지 않도록 명시적으로 전달.
+         '전환'은 화면 표시용 개념일 뿐 실제 분류는 '정규'(원데이 크레딧을 받은 정규 패스)로 저장한다. */
+      passTypeCode: (appData.passType==='전환' ? '정규' : appData.passType),
+      weeksCode: appData.onedayApplied ? appData.originalWeeks : appData.weeksToCalc,
+      isConversion: !!appData.onedayApplied,
+      onedayCreditPassKey: appData.onedayApplied ? (appData.onedayCreditPassKey || '') : ''
+    }])
       .then(function(ok) {
         _submitted=true; clearTimeout(_timeout);
         if(ok){
@@ -3010,7 +3052,7 @@
 
   function resetApp() {
     isFinalSubmitted = false; _stepProgress = []; _activeStepId = 'name'; _sheetHistoryPushed = false;
-    appData = {name:'',phoneMask:'',fullPhone:'',isNew:false,passType:'정규',option:'',amount:0,persons:1,startDate:'',endDate:'',weeksToCalc:0,memo:'',sessionText:'',occupiedDates:[],expDate:'',onedayDiscount:0,onedayApplied:false,originalWeeks:0};
+    appData = {name:'',phoneMask:'',fullPhone:'',isNew:false,passType:'정규',option:'',amount:0,persons:1,startDate:'',endDate:'',weeksToCalc:0,memo:'',sessionText:'',occupiedDates:[],expDate:'',onedayDiscount:0,onedayApplied:false,originalWeeks:0,realPassEligible:false,onedayVisitCount:0,onedayCreditPassKey:''};
     document.getElementById('userName').value = '';
     document.getElementById('userPhone').value = '';
     document.getElementById('searchResultBox').innerHTML = '';
