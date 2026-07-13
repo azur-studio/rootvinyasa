@@ -590,6 +590,10 @@
   function _bustCache(key) { cache[key]=false; _cacheTime[key]=0; }
   function _isFresh(key)   { return cache[key] && (Date.now()-_cacheTime[key])<CACHE_TTL[key]; }
 
+  // 대시보드 낙관적 변경 세대 카운터 — 토글 진행 중에 도착한 "그 이전 시점" 백그라운드
+  // 응답이 방금 반영한 낙관적 UI를 덮어써버리는 경쟁 상태를 막기 위함
+  let _dashGen = 0;
+
   function _getMember(name,phone){ return _memberMap.get(name+'::'+phone)||null; }
   function _setMember(m){
     const k=m.name+'::'+m.phone;
@@ -797,9 +801,14 @@
       // 캐시 있을 때: 로딩바 없이 백그라운드 갱신
       if(!isSyncing) {
         isSyncing = true;
+        const myGen = _dashGen;
         google.script.run
           .withSuccessHandler(function(data){
-            adminData=data; cache.dashboard=true; isSyncing=false;
+            isSyncing=false;
+            // 이 요청을 보낸 뒤 토글 등으로 낙관적 변경이 생겼다면 — 이 응답은 그 이전 시점 스냅샷이므로
+            // 그대로 반영하면 방금 사용자가 만든 변경을 덮어써버린다. 조용히 버린다.
+            if (myGen !== _dashGen) return;
+            adminData=data; _touchCache('dashboard');
             renderDashboard(); checkPendingBadgeSilently();
           })
           .withFailureHandler(function(){ isSyncing=false; })
@@ -809,9 +818,12 @@
     }
     if (isSyncing) return;
     isSyncing = true; showTopLoading();
+    const myGen = _dashGen;
     google.script.run
       .withSuccessHandler(function(data) {
-        adminData = data; cache.dashboard = true; isSyncing = false; hideTopLoading();
+        isSyncing = false; hideTopLoading();
+        if (myGen !== _dashGen) return;
+        adminData = data; _touchCache('dashboard');
         renderDashboard();
         checkPendingBadgeSilently();
       })
@@ -957,6 +969,7 @@
     const pkSafe = escapeHtml(passKey);
     const rowEl  = document.getElementById('pot_'+pkSafe);
     const cntEl  = document.getElementById('potentialCount');
+    _dashGen++; // 낙관적 변경 시작 — 이전에 요청된 백그라운드 응답은 도착해도 무시됨
     // 즉각 피드백: 행 흐리게
     if(rowEl) { rowEl.style.opacity='0.35'; rowEl.style.pointerEvents='none'; }
     google.script.run
@@ -986,6 +999,7 @@
     const isAdding = !currentlyPaused;
     const itemDiv  = document.getElementById('item_'+key);
     if (!itemDiv) return;
+    _dashGen++; // 낙관적 변경 시작 — 이전에 요청된 백그라운드 응답은 도착해도 무시됨
     const attBox = document.getElementById('attendeeList');
     const pBox   = document.getElementById('pausedList');
     const attCnt = document.getElementById('attCount');
