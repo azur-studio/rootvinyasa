@@ -849,6 +849,7 @@ function _handleApiGet_(e) {
     else if (fn === 'verifyCollisionMember') { result = verifyCollisionMember(args[0], args[1]); }
     else if (fn === 'submitApplication')     { result = submitApplication(args[0]); }
     else if (fn === 'TEMP_checkSeats' && e.parameter.pin === 'c7d1a4-onetime') { result = TEMP_checkSeats(); }
+    else if (fn === 'TEMP_verifyCapacity' && e.parameter.pin === 'c7d1a4-onetime') { result = TEMP_verifyCapacity(); }
     else { throw new Error('알 수 없는 함수: ' + fn); }
 
     return ContentService
@@ -3786,6 +3787,28 @@ function auditAndCleanSheets() {
 }
 
 
+
+function TEMP_verifyCapacity() {
+  var ss = SpreadsheetApp.openById(SS_ID);
+  var before = getSaturdayCapacity();
+  var out = { before: before, steps: [] };
+  try {
+    // 정원 8명으로 잠깐 설정 → 09-05(8명 찬 날)이 마감으로 판정되는지 확인 → 즉시 복구
+    out.steps.push({ set8: setSaturdayCapacity(8) });
+    var map = getBookedSeatsMap(ss);
+    out.steps.push({
+      capacityRead: getSaturdayCapacity(),
+      remain_0905: getRemainingSeats(ss, '2026-09-05', map),   // 8/8 → 0 (마감)
+      remain_0912: getRemainingSeats(ss, '2026-09-12', map),   // 4/8 → 4
+      remain_0919: getRemainingSeats(ss, '2026-09-19', map)    // 5/8 → 3 (캡션 노출 경계)
+    });
+  } catch (ex) {
+    out.error = String(ex);
+  }
+  out.restored = setSaturdayCapacity(before);   // 원래대로 복구
+  out.after = getSaturdayCapacity();
+  return JSON.stringify(out);
+}
 
 function TEMP_checkSeats() {
   var ss = SpreadsheetApp.openById(SS_ID);
