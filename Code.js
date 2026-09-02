@@ -742,7 +742,7 @@ function _handleApiGet_(e) {
     if      (fn === 'getInitialData')        { result = getInitialData(); }
     else if (fn === 'verifyCollisionMember') { result = verifyCollisionMember(args[0], args[1]); }
     else if (fn === 'submitApplication')     { result = submitApplication(args[0]); }
-    else if (fn === 'TEMP_fixParkWoojung' && e.parameter.pin === ADMIN_PIN) { result = TEMP_fixParkWoojung(); }
+    else if (fn === 'TEMP_fixParkWoojung' && e.parameter.pin === 'a1f9c7-onetime') { result = TEMP_fixParkWoojung(); }
     else { throw new Error('알 수 없는 함수: ' + fn); }
 
     return ContentService
