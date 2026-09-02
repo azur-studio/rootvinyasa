@@ -797,6 +797,7 @@
     .leg-dot { display: inline-block; vertical-align: middle; margin-right: 2px; }
     .leg-today { width:10px; height:10px; border:1px solid var(--text-faint); border-radius:50%; }
     .leg-exp   { width:4px;  height:4px;  background:var(--text-faint); border-radius:50%; }
+    .leg-full  { width:9px;  height:1px;  background:var(--text-faint); }
 
     .counter-box {
       display: flex;
@@ -921,6 +922,28 @@
       width: 3px; height: 3px;
       background: var(--text-faint);
       border-radius: 50%;
+    }
+    /* 정원 마감 — 지난 날짜(흐림만)·내가 등록한 날(가운데 취소선)과 구분되도록
+       숫자 아래 짧은 가로선. 범례의 leg-full과 같은 모양이라 뜻이 바로 읽힌다. */
+    .cal-date.full { position: relative; opacity: 0.3; cursor: default; }
+    .cal-date.full::after {
+      content: '';
+      position: absolute;
+      bottom: 4px;
+      width: 9px; height: 1px;
+      background: var(--text-faint);
+      border-radius: 0;
+    }
+
+    /* 잔여 자리 — 3자리 이하로 남았을 때만 나타난다(여유로울 땐 아무것도 안 보임) */
+    .seats-left-note {
+      display: none;
+      font-size: 12px;
+      font-weight: 400;
+      color: var(--text-faint);
+      letter-spacing: 0.02em;
+      text-align: center;
+      margin-bottom: 12px;
     }
 
     #preHolidayNotice {
@@ -1694,6 +1717,7 @@
           <div class="cal-legend">
             <div class="cal-legend-item"><span class="leg-dot leg-today"></span>오늘</div>
             <div class="cal-legend-item"><span class="leg-dot leg-exp"></span>지금 패스 만료일</div>
+            <div class="cal-legend-item" id="legendFull" style="display:none;"><span class="leg-dot leg-full"></span>정원 마감</div>
           </div>
           <div class="calendar-header">
             <button class="cal-nav-btn" onclick="changeMonth(-1)" aria-label="이전 달">◀</button>
@@ -1707,6 +1731,7 @@
             <a href="sms:01043130150" class="btn-contact-help">강사님께 여쭤보기</a>
           </div>
           <div class="result-dates-box" id="resultDatesBox"></div>
+          <div class="seats-left-note" id="seatsLeftNote"></div>
           <button class="btn-bottom" id="dateConfirmBtn" onclick="confirmDate()" disabled>이 일정으로 진행</button>
         </div>
       </div>
@@ -1771,6 +1796,9 @@
     realPassEligible:false, onedayVisitCount:0, onedayCreditPassKey:''
   };
   var holidaysList=[], holidayReasons={}, holidayTypes={}, memberDB=[];
+  /* 토요일 정원 — 0이면 제한 없음. bookedSeats는 {'2026-09-05': 8} 형태 */
+  var seatCapacity=0, bookedSeats={};
+  var SEATS_NOTE_FROM=3;   // 이 수 이하로 남았을 때만 잔여 자리를 알린다
 
   /* ── GAS API 호출 헬퍼 (GitHub Pages 배포용) ──────────────────
      google.script.run 대신 fetch()로 GAS 백엔드를 직접 호출합니다.
@@ -2229,6 +2257,7 @@
       .then(function(data) {
         holidaysList=data.holidays||[]; holidayReasons=data.holidayReasons||{};
         holidayTypes=data.holidayTypes||{}; memberDB=data.members||[];
+        seatCapacity=Number(data.capacity)||0; bookedSeats=data.bookedSeats||{};
         dataLoaded=true;
         checkReturningUser();
         /* 데이터 로드 완료 — CTA 등장, 폴러가 살아있으면 정리 */
@@ -2632,6 +2661,7 @@
     if (rdb) { rdb.style.display = 'none'; rdb.innerHTML = ''; }
     var dcb = document.getElementById('dateConfirmBtn');
     if (dcb) dcb.disabled = true;
+    renderSeatsNote();
   }
 
   function _recomputeScheduleFromStart() {
@@ -2735,6 +2765,7 @@
     if (otEl) otEl.innerText = appData.amount.toLocaleString()+'원';
     var calEl = document.getElementById('calGrid');
     if (!calEl || !calEl.children.length) setupCalendarEnv();
+    else renderCalendar();   // 인원이 바뀌었으면 받을 수 있는 날짜도 달라진다
     activateStep('date');
     var dcb2 = document.getElementById('dateConfirmBtn');
     if (dcb2) dcb2.disabled = !appData.startDate;
@@ -2745,6 +2776,8 @@
     appData.amount=appData.persons*ONE_DAY_PRICE;
     document.getElementById('personCount').innerText=appData.persons;
     document.getElementById('oneDayTotal').innerText=appData.amount.toLocaleString()+'원';
+    // 인원이 늘면 이미 고른 날짜가 그만큼 못 받을 수 있다 — 그 자리에서 풀어준다
+    if (appData.startDate && isDateFull(appData.startDate)) _resetSchedule();
   }
 
   /* ══════════════════════════════════════════════════════════
@@ -2768,14 +2801,14 @@
     var chk=new Date(today);
     while(chk<=maxValidDate) {
       var ds=fmtDate(chk), isMH=holidaysList.indexOf(ds)!==-1&&holidayTypes[ds]!=='선택';
-      if(chk.getDay()===6&&chk>=minValidDate&&!isMH&&appData.occupiedDates.indexOf(ds)===-1) totalValidDatesInWindow++;
+      if(chk.getDay()===6&&chk>=minValidDate&&!isMH&&appData.occupiedDates.indexOf(ds)===-1&&!isDateFull(ds)) totalValidDatesInWindow++;
       chk.setDate(chk.getDate()+1);
     }
     var seek=new Date(minValidDate), foundM=false;
     for(var i=0;i<=60;i++) {
       if(seek.getDay()===6) {
         var sd=fmtDate(seek), isMH2=holidaysList.indexOf(sd)!==-1&&holidayTypes[sd]!=='선택';
-        if(!isMH2&&appData.occupiedDates.indexOf(sd)===-1&&seek<=maxValidDate) {
+        if(!isMH2&&appData.occupiedDates.indexOf(sd)===-1&&!isDateFull(sd)&&seek<=maxValidDate) {
           currentNavYear=seek.getFullYear(); currentNavMonth=seek.getMonth(); foundM=true; break;
         }
       }
@@ -2810,6 +2843,37 @@
     renderCalendar();
   }
 
+  /* 이번 신청이 그날 차지할 자리 수 — 원데이만 동반 인원만큼 잡는다.
+     정규·연장은 시작일 한 자리만 본다(이후 주차는 정원을 안 본다). */
+  function neededSeats() {
+    return (appData.weeksToCalc === 1 && appData.option.indexOf('원데이') !== -1)
+      ? Math.max(1, appData.persons || 1) : 1;
+  }
+
+  function seatsLeftOn(ds) {
+    if (!seatCapacity) return 9999;          // 정원 미설정 = 제한 없음
+    return Math.max(0, seatCapacity - (bookedSeats[ds] || 0));
+  }
+
+  /* 그날 이 신청을 받을 수 있는지 — 2인 원데이는 2자리가 남아야 한다 */
+  function isDateFull(ds) {
+    return seatCapacity ? (seatsLeftOn(ds) < neededSeats()) : false;
+  }
+
+  /* 고른 날짜의 잔여 자리 안내 — 3자리 이하일 때만 보이고, 그 이상이면 아무것도 안 띄운다 */
+  function renderSeatsNote() {
+    var el = document.getElementById('seatsLeftNote');
+    if (!el) return;
+    var left = appData.startDate ? seatsLeftOn(appData.startDate) : 9999;
+    if (!seatCapacity || !appData.startDate || left > SEATS_NOTE_FROM) {
+      el.style.display = 'none';
+      el.innerText = '';
+      return;
+    }
+    el.innerText = left + '자리 남음';
+    el.style.display = 'block';
+  }
+
   function renderCalendar() {
     var grid=document.getElementById('calGrid'), html='';
     var dayNames=['일','월','화','수','목','금','토'];
@@ -2817,15 +2881,22 @@
     document.getElementById('calMonthText').innerText=currentNavYear+'. '+String(currentNavMonth+1).padStart(2,'0');
     var firstDay=new Date(currentNavYear,currentNavMonth,1).getDay(), daysInMonth=new Date(currentNavYear,currentNavMonth+1,0).getDate();
     var today=new Date(); today.setHours(0,0,0,0);
+    var anyFullInView=false;
     for(var e=0;e<firstDay;e++) html+='<div></div>';
     for(var i=1;i<=daysInMonth;i++){
       var ld=new Date(currentNavYear,currentNavMonth,i), ds=fmtDate(ld), cls='cal-date';
       var isHol=holidaysList.indexOf(ds)!==-1, isOpt=isHol&&holidayTypes[ds]==='선택', isMand=isHol&&!isOpt;
       var isOcc=appData.occupiedDates.indexOf(ds)!==-1, isExp=appData.expDate&&ds===appData.expDate;
       var isSkp=skippedHolidayDates.indexOf(ds)!==-1, isOut=ld<minValidDate||ld>maxValidDate||ld.getDay()!==6;
+      // 정원 마감 판정은 "지금 새로 고를 수 있는 토요일"에만 의미가 있다.
+      // 이미 고른 일정에 포함된 날(sessionDates)은 첫날만 검사한다는 정책상 마감 표시를 하지 않는다.
+      var isFull=!isOut&&!isHol&&!isOcc&&ld.getDay()===6
+        &&sessionDates.indexOf(ds)===-1&&isDateFull(ds);
+      if(isFull) anyFullInView=true;
       if(ld.getTime()===today.getTime()) cls+=' today';
       if(isExp) cls+=' exp-date';
       if(isOcc) cls+=' disabled occupied';
+      else if(isFull) cls+=' full';
       else if(sessionDates.indexOf(ds)!==-1) cls+=' session-date'+(isOut?' disabled':'');
       else if(isSkp) cls+=isMand?' skipped-holiday':' disabled';
       else if(isMand) cls+=' disabled skipped-holiday';
@@ -2834,9 +2905,21 @@
       html+='<div class="'+cls+'" onclick="selectDate(\''+ds+'\',this)">'+i+'</div>';
     }
     grid.innerHTML=html;
+    // 범례의 '정원 마감'은 이번 달에 실제로 마감된 날이 있을 때만 보여준다
+    var legFull=document.getElementById('legendFull');
+    if(legFull) legFull.style.display=anyFullInView?'':'none';
+    renderSeatsNote();
   }
 
   function selectDate(dateStr, el) {
+    // 마감된 날은 왜 안 눌리는지 그 자리에서 알려준다 — 조용히 무시하면 고장으로 보인다
+    if (el && el.classList.contains('full')) {
+      var need = neededSeats();
+      showCustomAlert(need > 1
+        ? '이 날은 ' + need + '자리가 남아있지 않습니다.\n인원을 줄이거나 다른 날짜를 골라주세요.'
+        : '이 토요일은 정원이 찼습니다.\n다른 날짜를 골라주세요.');
+      return;
+    }
     if (el && (el.classList.contains('disabled') || el.classList.contains('occupied'))) return;
     appData.startDate = dateStr;
     /* 시작일·일정·요약박스를 한 곳에서 계산·렌더 (selectOption 의 주차 변경 경로와 동일 동작) */

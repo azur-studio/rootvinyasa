@@ -328,6 +328,18 @@ if (startDateCheck) {
 }
     var ss = SpreadsheetApp.openById(SS_ID);
     var logSheet = ss.getSheetByName(SHEET_LOG);
+
+    // ── 정원 최종 확인 ──────────────────────────────────────────────
+    // 화면에서 자리를 확인한 뒤 제출하기까지 사이에 다른 사람이 먼저 채웠을 수 있다.
+    // 잠금(lock) 안에서 다시 세어 초과 신청을 여기서 막는다. 시작일 하루만 검사.
+    if (getSaturdayCapacity() && payload.startDate) {
+      var needSeats = seatsOfApplication(String(payload.option || ''), payload.amount);
+      if (getRemainingSeats(ss, String(payload.startDate)) < needSeats) {
+        lock.releaseLock();
+        return false;
+      }
+    }
+
     var finalPhoneToSave = "";
     
     if (payload.isNew) {
@@ -450,8 +462,7 @@ function confirmPaymentAdmin(rowIdx) {
       // 주의: "원데이 전환 한 달 (4주)"처럼 전환 신청에도 '원데이'가 들어 있다.
       // 기간(주/회)이 적혀 있으면 그 기간이 진짜이고, 기간이 없는 "원데이 클래스"만 1회권이다.
       // (이 구분이 없어서 85,000원 4주 전환 건이 원데이 1회로 저장된 사고가 있었음)
-      var isOnedayPass = option.indexOf('원데이') >= 0
-        && option.indexOf('주') === -1 && option.indexOf('회') === -1;
+      var isOnedayPass = isOnedayOption(option);
       weeks = 4;
       if (option.indexOf('12주') >= 0 || option.indexOf('12회') >= 0) weeks = 12;
       else if (option.indexOf('8주') >= 0 || option.indexOf('8회') >= 0) weeks = 8;
@@ -575,6 +586,101 @@ function calcOnedayPersons(amount, totalWeeks) {
   if (Number(totalWeeks) !== 1) return 1;   // 1회짜리 수강권만 해당
   var n = Number(amount) / ONE_DAY_PRICE;
   return (n >= 2 && n === Math.floor(n)) ? n : 1;
+}
+
+/* 신청 문구가 진짜 1회짜리 원데이인지 — "원데이 전환 한 달 (4주)"처럼
+   기간이 적힌 것은 원데이가 아니다. 분류 판정·인원 판정이 이 하나만 본다. */
+function isOnedayOption(option) {
+  var o = String(option || '');
+  return o.indexOf('원데이') >= 0 && o.indexOf('주') === -1 && o.indexOf('회') === -1;
+}
+
+/* 신청 1건이 그날 차지하는 자리 수 — 원데이만 동반 인원이 있을 수 있다 */
+function seatsOfApplication(option, amount) {
+  return isOnedayOption(option) ? calcOnedayPersons(amount, 1) : 1;
+}
+
+
+// ──────────────────────────────────────────────
+// 11-Y. 토요일 정원 (공용)
+//   정원은 "신청 시작일" 하루만 본다. 정규·연장이 몇 주를 물고 가든
+//   이후 주차는 검사하지 않는다(기존 회원의 쉬어가기 연장과 같은 취급).
+//   설정값이 없거나 0이면 정원 제한 없음 — 기존 동작 그대로.
+// ──────────────────────────────────────────────
+var SETTING_CAPACITY = '토요일 정원';
+
+function getSaturdayCapacity() {
+  var v = Number(getSetting(SETTING_CAPACITY, 0));
+  return (isFinite(v) && v > 0) ? Math.floor(v) : 0;
+}
+
+/* 날짜별로 이미 잡힌 자리 수 — 확정된 수강생 + 아직 입금확인 전인 신청까지.
+   미확정 신청을 빼면 입금 확인을 기다리는 사이에 정원이 초과된다. */
+function getBookedSeatsMap(ss) {
+  var map = {};
+  var today = new Date(); today.setHours(0, 0, 0, 0);
+  var todayStr = formatDateSafe(today);
+
+  // ① 확정분 — 통합 수강 DB의 수강 예정일
+  var dbSheet = ss.getSheetByName(SHEET_DB_NEW);
+  if (dbSheet) {
+    var dbData = dbSheet.getDataRange().getValues();
+    for (var i = 1; i < dbData.length; i++) {
+      if (!dbData[i][0]) continue;
+      var seats = calcOnedayPersons(Number(dbData[i][4]), Number(dbData[i][5]));
+      var datesG = getSafeString(dbData[i][6]).split(',').map(function(s){ return s.trim(); }).filter(String);
+      for (var d = 0; d < datesG.length; d++) {
+        if (datesG[d] < todayStr) continue;             // 지난 날짜는 셀 필요 없음
+        map[datesG[d]] = (map[datesG[d]] || 0) + seats;
+      }
+    }
+  }
+
+  // ② 미확정분 — 신청은 들어왔지만 아직 입금 확인(H열) 전인 건의 시작일
+  var logSheet = ss.getSheetByName(SHEET_LOG);
+  if (logSheet) {
+    var logData = logSheet.getDataRange().getValues();
+    for (var j = 1; j < logData.length; j++) {
+      if (!logData[j][1]) continue;
+      if (logData[j][7] === true) continue;             // 확정분은 ①에서 이미 셈
+      var startStr = String(logData[j][4] || '').split('~')[0].trim();
+      if (!startStr || startStr < todayStr) continue;
+      map[startStr] = (map[startStr] || 0)
+        + seatsOfApplication(String(logData[j][3]), Number(logData[j][5]));
+    }
+  }
+  return map;
+}
+
+/* 그 날짜에 남은 자리. 정원 미설정이면 넉넉한 수를 돌려준다(제한 없음) */
+function getRemainingSeats(ss, dateStr, bookedMap) {
+  var capacity = getSaturdayCapacity();
+  if (!capacity) return 9999;
+  var booked = (bookedMap || getBookedSeatsMap(ss))[dateStr] || 0;
+  return Math.max(0, capacity - booked);
+}
+
+/* 관리자 화면에서 정원 변경 — 설정 시트의 값을 그 자리에서 고친다(없으면 새로 추가) */
+function setSaturdayCapacity(value) {
+  var n = Number(value);
+  if (!isFinite(n) || n < 0 || n > 200) return false;
+  n = Math.floor(n);
+  try {
+    var sheet = SpreadsheetApp.openById(SS_ID).getSheetByName(SHEET_SETTINGS);
+    if (!sheet) return false;
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][0]).trim() === SETTING_CAPACITY) {
+        sheet.getRange(i + 1, 2).setValue(n);
+        return true;
+      }
+    }
+    sheet.appendRow([SETTING_CAPACITY, n, '이 인원(원데이 동반 포함)이 차면 그 토요일은 신청 마감']);
+    return true;
+  } catch (ex) {
+    Logger.log('[setSaturdayCapacity] ' + ex);
+    return false;
+  }
 }
 
 
@@ -939,6 +1045,7 @@ function getAdminDashboardData(weekOffset) {
   }
   // 원데이 동반 인원까지 합산한 실제 참석 인원(칸 수) — 명단 행 수(res.attendees.length)와 다를 수 있음
   res.attendeeHeadcount = res.attendees.reduce(function(sum, m) { return sum + (m.persons || 1); }, 0);
+  res.capacity = getSaturdayCapacity();   // 0이면 정원 제한 없음
   return res;
 }
 
@@ -1235,7 +1342,8 @@ function buildMaskMap(members) {
 // ──────────────────────────────────────────────
 function getInitialData() {
   var ss = SpreadsheetApp.openById(SS_ID);
-  var result = { holidays: [], holidayReasons: {}, holidayTypes: {}, members: [] };
+  var result = { holidays: [], holidayReasons: {}, holidayTypes: {}, members: [],
+                 capacity: 0, bookedSeats: {} };
   var today = new Date(); today.setHours(0, 0, 0, 0);
 
   try {
@@ -1243,6 +1351,10 @@ function getInitialData() {
     result.holidays = holidayData.all;
     result.holidayReasons = holidayData.reasons;
     result.holidayTypes = holidayData.types;
+
+    // 토요일 정원 — 신청 화면이 마감된 날짜를 표시하고 잔여 자리를 안내하는 데 씀
+    result.capacity = getSaturdayCapacity();
+    if (result.capacity) result.bookedSeats = getBookedSeatsMap(ss);
 
     var dbSheet = ss.getSheetByName(SHEET_DB_NEW);
     if (!dbSheet) return result;
@@ -1333,11 +1445,8 @@ function getInitialData() {
           if (odDate > odToday) continue;
           var odDiff = Math.floor((odToday - odDate) / 86400000);
           if (odDiff > 14) continue;
-          var odPersons = 1;
-          var odPm = odOpt.match(/(\d+)명/);
-          if (odPm) odPersons = parseInt(odPm[1]);
           var odAmt = Number(odRow[5]) || 0;
-          var odPerPerson = odPersons > 0 ? Math.round(odAmt / odPersons) : odAmt;
+          var odPerPerson = Math.round(odAmt / calcOnedayPersons(odAmt, 1));
           if (odPerPerson <= 0) continue;
           var odKey = odName + '_' + odPhone;
           if (!onedayDiscountMap[odKey]) {

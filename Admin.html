@@ -144,6 +144,16 @@
     .section-hd { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:12px; padding:0 4px; }
     .section-hd-title { font-size:17px; font-weight:700; }
     .section-hd-count { font-size:13px; color:var(--text-3); font-weight:500; }
+    /* 정원 — 임박하면 색으로만 알린다. 꽉 차면 신청이 막힌 상태 */
+    .cap-near { color:var(--gold); font-weight:600; }
+    .cap-over { color:var(--red);  font-weight:600; }
+    .cap-set  { font-size:11px; color:var(--text-5); margin-left:7px; text-decoration:underline; cursor:pointer; }
+    .cap-edit { display:flex; align-items:center; gap:8px; margin:2px 0 10px; }
+    .cap-edit-label { font-size:12px; color:var(--text-4); white-space:nowrap; }
+    .cap-edit .em-input { flex:1; }
+    .cap-edit-save { background:var(--gold); color:#fff; border:none; padding:10px 16px; font-size:13px;
+                     font-weight:600; border-radius:10px; font-family:inherit; white-space:nowrap; cursor:pointer; }
+    .cap-edit-save:active { opacity:.85; }
 
     /* ── ROSTER ITEM ── */
     .roster-card { background:var(--card); border-radius:var(--r-lg); overflow:hidden; box-shadow:var(--shadow-sm); }
@@ -420,6 +430,11 @@
         <div class="section-hd">
           <span class="section-hd-title">오시는 분</span>
           <span class="section-hd-count" id="attCount">- 명</span>
+        </div>
+        <div class="cap-edit" id="capEdit" style="display:none;">
+          <span class="cap-edit-label">토요일 정원</span>
+          <input type="number" id="capInput" class="em-input" min="0" max="200" placeholder="0 = 제한 없음">
+          <button class="cap-edit-save" onclick="saveCapacity()">저장</button>
         </div>
         <div class="roster-card" id="attendeeList"><div class="empty-state">데이터를 불러오는 중입니다...</div></div>
         <div class="roster-hint">스위치는 '쉬어가기' 빠른 처리예요. 홀딩·날짜별 변경은 이름을 눌러 상세에서 하세요.</div>
@@ -922,7 +937,7 @@
       const att = adminData.attendees || [];
       const attHeadcount = (adminData.attendeeHeadcount != null) ? adminData.attendeeHeadcount
         : att.reduce((sum, m) => sum + (m.persons || 1), 0);
-      document.getElementById('attCount').innerText = attHeadcount + ' 명';
+      renderAttCount(attHeadcount);
       if (att.length === 0) {
         attBox.innerHTML = isGeneralHol
           ? '<div class="empty-state">휴강일입니다.</div>'
@@ -1274,6 +1289,53 @@
     membersData.forEach(m => { m._hasAnomaly = _activeAnomalies.some(a=>a.memberName===m.name); });
     _renderAnomalyBanner();
   }
+  /* 참석 인원 표시 — 정원이 설정돼 있으면 "8/12명", 없으면 지금처럼 "8 명".
+     정원 부분을 누르면 그 자리에서 바꾼다(설정 화면을 따로 두지 않는다). */
+  function renderAttCount(headcount) {
+    const el = document.getElementById('attCount');
+    if (!el) return;
+    const cap = Number(adminData.capacity) || 0;
+    if (!cap) {
+      el.innerHTML = headcount + ' 명 <span class="cap-set" onclick="promptCapacity(event)">정원</span>';
+      return;
+    }
+    const cls = headcount >= cap ? 'cap-over' : (headcount >= cap * 0.9 ? 'cap-near' : '');
+    el.innerHTML = `<span class="${cls}">${headcount}/${cap}명</span>`
+      + `<span class="cap-set" onclick="promptCapacity(event)">수정</span>`;
+  }
+
+  /* 정원 수정 — 헤더 아래에 입력 한 줄만 펼친다(수강권 추가 폼과 같은 방식) */
+  function promptCapacity(ev) {
+    if (ev) ev.stopPropagation();
+    const box = document.getElementById('capEdit');
+    if (!box) return;
+    const open = box.style.display !== 'none';
+    box.style.display = open ? 'none' : 'flex';
+    if (!open) {
+      const inp = document.getElementById('capInput');
+      inp.value = Number(adminData.capacity) || '';
+      inp.focus();
+    }
+  }
+
+  function saveCapacity() {
+    const n = Number(String(document.getElementById('capInput').value).trim());
+    if (!isFinite(n) || n < 0 || n > 200) { showCustomAlert('0에서 200 사이 숫자로 넣어주세요.'); return; }
+    showCustomConfirm(n ? `토요일 정원을 ${n}명으로 바꿀까요?` : '정원 제한을 없앨까요?', function(ok) {
+      if (!ok) return;
+      google.script.run
+        .withSuccessHandler(function(saved) {
+          if (!saved) { showCustomAlert('정원을 저장하지 못했습니다.'); return; }
+          adminData.capacity = n;
+          document.getElementById('capEdit').style.display = 'none';
+          _bustCache('dashboard');
+          renderDashboard();
+        })
+        .withFailureHandler(function(){ showCustomAlert('서버 통신 오류가 발생했습니다.'); })
+        .setSaturdayCapacity(n);
+    });
+  }
+
   function _getDismissedAnomalies() { try{return JSON.parse(localStorage.getItem('admin_dismissed_anomalies')||'[]');}catch(e){return[];} }
   function dismissAnomaly(key) {
     let d=_getDismissedAnomalies(); if(d.indexOf(key)===-1)d.push(key);
