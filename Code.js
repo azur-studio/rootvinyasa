@@ -652,6 +652,132 @@ function getBookedSeatsMap(ss) {
   return map;
 }
 
+// ──────────────────────────────────────────────
+// 11-Z. 스쿨링크 연동 (정원 공유) — 2026-09-03
+//   로그 시트 R열(18)=출처('스쿨링크' 또는 빈칸=루트빈야사 자체),
+//   S열(19)=스쿨링크 예약 고유ID. 기존 컬럼(A~Q)은 전혀 안 건드림.
+//   비밀키는 스크립트 속성 'SKOOLINK_SYNC_SECRET'.
+// ──────────────────────────────────────────────
+function _checkSyncSecret_(key) {
+  var real = PropertiesService.getScriptProperties().getProperty('SKOOLINK_SYNC_SECRET');
+  return !!real && String(key || '') === real;
+}
+
+/* 스쿨링크 예약 확정 → 로그에 이름 추가 (미확정 상태로 남겨 DB 이관 없이 집계만 됨) */
+function addSkoolinkBooking(dateStr, name, seats, secretKey) {
+  if (!_checkSyncSecret_(secretKey)) return { ok: false, error: '인증 실패' };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dateStr || ''))) return { ok: false, error: '날짜 형식 오류' };
+  var n = Number(seats);
+  if (!isFinite(n) || n < 1 || n > 20) return { ok: false, error: '인원 오류' };
+  var nm = String(name || '').trim().slice(0, 30);
+  if (!nm) return { ok: false, error: '이름 필요' };
+  var reservationId = 'sk_' + Utilities.getUuid();
+
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(5000);
+    var ss = SpreadsheetApp.openById(SS_ID);
+    var logSheet = ss.getSheetByName(SHEET_LOG);
+    logSheet.insertRowAfter(1);
+    var row = logSheet.getRange(2, 1, 1, 9);
+    row.setValues([[
+      new Date(), nm, '', '원데이 클래스', dateStr + ' ~ ' + dateStr,
+      n * ONE_DAY_PRICE, '[스쿨링크 연동]', false, ''
+    ]]);
+    logSheet.getRange(2, 1).setNumberFormat('yyyy. MM. dd HH:mm');
+    logSheet.getRange(2, 6).setNumberFormat('#,##0');
+    logSheet.getRange(2, 1, 1, 9).setBackground('#e0f2ff'); // 연파랑 — 스쿨링크발 구분
+    logSheet.getRange(2, 18, 1, 2).setValues([['스쿨링크', reservationId]]);
+    return { ok: true, reservationId: reservationId };
+  } catch (ex) {
+    Logger.log('[addSkoolinkBooking] ' + ex);
+    return { ok: false, error: String(ex) };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/* 스쿨링크 예약 취소 → 해당 로그 행 삭제 */
+function cancelSkoolinkBooking(reservationId, secretKey) {
+  if (!_checkSyncSecret_(secretKey)) return { ok: false, error: '인증 실패' };
+  var rid = String(reservationId || '');
+  if (!rid) return { ok: false, error: 'ID 필요' };
+
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(5000);
+    var ss = SpreadsheetApp.openById(SS_ID);
+    var logSheet = ss.getSheetByName(SHEET_LOG);
+    var data = logSheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][18] || '') === rid) {  // S열 = index 18
+        logSheet.deleteRow(i + 1);
+        return { ok: true };
+      }
+    }
+    return { ok: false, error: '해당 예약을 찾지 못함' };
+  } catch (ex) {
+    Logger.log('[cancelSkoolinkBooking] ' + ex);
+    return { ok: false, error: String(ex) };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/* 스쿨링크가 3분마다 폴링 — 루트빈야사 "자체"(스쿨링크 제외) 인원만 집계해서
+   정원 대비 남은 자리를 돌려준다. 대시보드/명단용 getBookedSeatsMap은 절대 안 건드림 —
+   이 함수는 별도로 스쿨링크 출처 행만 제외하고 똑같이 계산한다. */
+function getLocalRemainingSeats(secretKey) {
+  if (!_checkSyncSecret_(secretKey)) return { ok: false, error: '인증 실패' };
+  var capacity = getSaturdayCapacity();
+  var ss = SpreadsheetApp.openById(SS_ID);
+  var today = new Date(); today.setHours(0, 0, 0, 0);
+  var todayStr = formatDateSafe(today);
+  var map = {};
+
+  var dbSheet = ss.getSheetByName(SHEET_DB_NEW);
+  if (dbSheet) {
+    var dbData = dbSheet.getDataRange().getValues();
+    for (var i = 1; i < dbData.length; i++) {
+      if (!dbData[i][0]) continue;
+      var seats = calcOnedayPersons(Number(dbData[i][4]), Number(dbData[i][5]));
+      var datesG = getSafeString(dbData[i][6]).split(',').map(function(s){ return s.trim(); }).filter(String);
+      for (var d = 0; d < datesG.length; d++) {
+        if (datesG[d] < todayStr) continue;
+        map[datesG[d]] = (map[datesG[d]] || 0) + seats;
+      }
+    }
+  }
+
+  var logSheet = ss.getSheetByName(SHEET_LOG);
+  if (logSheet) {
+    var logData = logSheet.getDataRange().getValues();
+    for (var j = 1; j < logData.length; j++) {
+      if (!logData[j][1]) continue;
+      if (logData[j][7] === true) continue;
+      if (String(logData[j][17] || '') === '스쿨링크') continue;  // R열 — 로컬 집계에서 제외
+      var startStr = String(logData[j][4] || '').split('~')[0].trim();
+      if (!startStr || startStr < todayStr) continue;
+      map[startStr] = (map[startStr] || 0)
+        + seatsOfApplication(String(logData[j][3]), Number(logData[j][5]));
+    }
+  }
+
+  if (!capacity) return { ok: true, capacity: 0, remaining: {} }; // 무제한 — 스쿨링크가 알아서 처리
+  var remaining = {};
+  Object.keys(map).forEach(function(d) { remaining[d] = Math.max(0, capacity - map[d]); });
+  // 앞으로 몇 주간은 예약이 아예 없어도 remaining에 안 잡히므로, 향후 12주치는 항상 채워준다.
+  var d0 = new Date(today);
+  var dow = d0.getDay();
+  d0.setDate(d0.getDate() + ((6 - dow + 7) % 7)); // 이번 주 토요일(오늘 포함)로 이동
+  for (var w = 0; w < 12; w++) {
+    var ds = formatDateSafe(d0);
+    if (!(ds in remaining)) remaining[ds] = capacity;
+    d0.setDate(d0.getDate() + 7);
+  }
+  return { ok: true, capacity: capacity, remaining: remaining };
+}
+
 /* 그 날짜에 남은 자리. 정원 미설정이면 넉넉한 수를 돌려준다(제한 없음) */
 function getRemainingSeats(ss, dateStr, bookedMap) {
   var capacity = getSaturdayCapacity();
@@ -848,6 +974,9 @@ function _handleApiGet_(e) {
     if      (fn === 'getInitialData')        { result = getInitialData(); }
     else if (fn === 'verifyCollisionMember') { result = verifyCollisionMember(args[0], args[1]); }
     else if (fn === 'submitApplication')     { result = submitApplication(args[0]); }
+    else if (fn === 'addSkoolinkBooking')    { result = addSkoolinkBooking(args[0], args[1], args[2], args[3]); }
+    else if (fn === 'cancelSkoolinkBooking') { result = cancelSkoolinkBooking(args[0], args[1]); }
+    else if (fn === 'getLocalRemainingSeats'){ result = getLocalRemainingSeats(args[0]); }
     else { throw new Error('알 수 없는 함수: ' + fn); }
 
     return ContentService
@@ -3783,3 +3912,5 @@ function auditAndCleanSheets() {
   Logger.log(summary);
   return summary;
 }
+
+
