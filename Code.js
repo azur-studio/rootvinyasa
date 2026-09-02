@@ -742,7 +742,6 @@ function _handleApiGet_(e) {
     if      (fn === 'getInitialData')        { result = getInitialData(); }
     else if (fn === 'verifyCollisionMember') { result = verifyCollisionMember(args[0], args[1]); }
     else if (fn === 'submitApplication')     { result = submitApplication(args[0]); }
-    else if (fn === 'TEMP_mergeParkWoojung' && e.parameter.pin === 'b3e8d2-onetime') { result = TEMP_mergeParkWoojung(); }
     else { throw new Error('알 수 없는 함수: ' + fn); }
 
     return ContentService
@@ -3677,33 +3676,3 @@ function auditAndCleanSheets() {
 }
 
 
-function TEMP_mergeParkWoojung() {
-  var ss = SpreadsheetApp.openById(SS_ID);
-  var dbSheet = ss.getSheetByName(SHEET_DB_NEW);
-  var logSheet = ss.getSheetByName(SHEET_LOG);
-  var data = dbSheet.getDataRange().getValues();
-  var origRow = -1, dupRow = -1;
-  for (var i = 1; i < data.length; i++) {
-    if (String(data[i][0]) === '박우정4575_0829_3510') origRow = i;
-    if (String(data[i][0]) === '박우정4575_0905_9963') dupRow = i;
-  }
-  if (origRow === -1 || dupRow === -1) return 'NOT FOUND origRow=' + origRow + ' dupRow=' + dupRow;
-
-  dbSheet.getRange(origRow + 1, 4).setValue('정규');
-  dbSheet.getRange(origRow + 1, 5).setValue(50000);
-  dbSheet.getRange(origRow + 1, 6).setValue(4);
-  dbSheet.getRange(origRow + 1, 7).setValue("'2026-08-29, 2026-09-05, 2026-09-12, 2026-09-19");
-  dbSheet.deleteRow(dupRow + 1);
-
-  var logData = logSheet.getDataRange().getValues();
-  var logFixed = 'none';
-  for (var j = 1; j < logData.length; j++) {
-    if (String(logData[j][8]) === '박우정4575_0905_9963') {
-      logSheet.getRange(j + 1, 9).setValue('박우정4575_0829_3510');
-      logFixed = 'log row ' + (j + 1);
-      break;
-    }
-  }
-  var check = dbSheet.getRange(origRow + 1, 1, 1, 9).getValues()[0];
-  return JSON.stringify({ merged: check, logFixed: logFixed, maxPauses: Math.floor(4 / 4) });
-}
