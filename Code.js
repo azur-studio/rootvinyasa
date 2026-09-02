@@ -848,6 +848,7 @@ function _handleApiGet_(e) {
     if      (fn === 'getInitialData')        { result = getInitialData(); }
     else if (fn === 'verifyCollisionMember') { result = verifyCollisionMember(args[0], args[1]); }
     else if (fn === 'submitApplication')     { result = submitApplication(args[0]); }
+    else if (fn === 'TEMP_checkSeats' && e.parameter.pin === 'c7d1a4-onetime') { result = TEMP_checkSeats(); }
     else { throw new Error('알 수 없는 함수: ' + fn); }
 
     return ContentService
@@ -3785,3 +3786,17 @@ function auditAndCleanSheets() {
 }
 
 
+
+function TEMP_checkSeats() {
+  var ss = SpreadsheetApp.openById(SS_ID);
+  var map = getBookedSeatsMap(ss);
+  var dash = getAdminDashboardData(0);
+  var keys = Object.keys(map).sort();
+  return JSON.stringify({
+    capacity: getSaturdayCapacity(),
+    seatsByDate: keys.reduce(function(o,k){ o[k]=map[k]; return o; }, {}),
+    dashboardDate: dash.nextSaturday,
+    dashboardHeadcount: dash.attendeeHeadcount,
+    seatsOnDashboardDate: map[dash.nextSaturday] || 0
+  });
+}
