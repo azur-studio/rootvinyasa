@@ -447,13 +447,19 @@ function confirmPaymentAdmin(rowIdx) {
       weeks = weeksCode || 4;
     } else {
       // ── 구버전 로그 호환 (재설계 이전 신청 건) ──
+      // 주의: "원데이 전환 한 달 (4주)"처럼 전환 신청에도 '원데이'가 들어 있다.
+      // 기간(주/회)이 적혀 있으면 그 기간이 진짜이고, 기간이 없는 "원데이 클래스"만 1회권이다.
+      // (이 구분이 없어서 85,000원 4주 전환 건이 원데이 1회로 저장된 사고가 있었음)
+      var isOnedayPass = option.indexOf('원데이') >= 0
+        && option.indexOf('주') === -1 && option.indexOf('회') === -1;
       weeks = 4;
       if (option.indexOf('12주') >= 0 || option.indexOf('12회') >= 0) weeks = 12;
       else if (option.indexOf('8주') >= 0 || option.indexOf('8회') >= 0) weeks = 8;
       else if (option.indexOf('5회') >= 0 || option.indexOf('5주') >= 0) weeks = 5;
-      else if (option.indexOf('원데이') >= 0) weeks = 1;
-      classify = option.indexOf('연장') >= 0 ? '연장' : (option.indexOf('원데이') >= 0 ? '원데이' : '정규');
-      isConversion = option.indexOf('원데이 할인') >= 0 && classify !== '원데이';
+      else if (isOnedayPass) weeks = 1;
+      classify = isOnedayPass ? '원데이' : (option.indexOf('연장') >= 0 ? '연장' : '정규');
+      isConversion = !isOnedayPass
+        && (option.indexOf('원데이 할인') >= 0 || option.indexOf('원데이 전환') >= 0);
     }
     if (option.indexOf('특별') >= 0 || option.indexOf('특정') >= 0) classify = '특정';
 
@@ -519,16 +525,9 @@ function confirmPaymentAdmin(rowIdx) {
 
     // ── 병합 대상 없음 — 새 행 생성 (일반 등록, 구버전 폴백 등) ──
     var passKey = name + phone.slice(-4) + '_' + startDateStr.split('-').join('').slice(4) + '_' + new Date().getTime().toString().slice(-4);
-    // 원데이는 대표자 1명 이름으로 신청해도 동반 인원이 있을 수 있음(option에 "N명" 포함) —
-    // K열에 인원수를 저장해 대시보드 참석 인원 집계에 반영(대표자 명단 행은 그대로 1개 유지).
-    var onedayPersons = 1;
-    if (classify === '원데이') {
-      var pMatch = option.match(/(\d+)명/);
-      if (pMatch) onedayPersons = parseInt(pMatch[1], 10) || 1;
-    }
     dbSheet.insertRowAfter(1);
-    var targetDBRange = dbSheet.getRange(2, 1, 1, 11);
-    targetDBRange.setValues([[passKey, name, "'" + phone, classify, amount, weeks, "'" + datesString, '', row[6] || '', '', onedayPersons]]);
+    var targetDBRange = dbSheet.getRange(2, 1, 1, 9);
+    targetDBRange.setValues([[passKey, name, "'" + phone, classify, amount, weeks, "'" + datesString, '', row[6] || '']]);
     targetDBRange.setFontColor(null);
 
     logSheet.getRange(rowIdx, 8).setValue(true);
@@ -564,6 +563,22 @@ function confirmPaymentAdminWithSMS(rowIdx) {
 
 
 // ──────────────────────────────────────────────
+// 11-Z. 원데이 인원수 판별 (공용)
+//   신청 로그의 수강권 문구는 인원과 무관하게 늘 "원데이 클래스"라서,
+//   동반 인원은 결제액으로만 알 수 있다(2인이면 70,000원).
+//   단가의 정확한 배수일 때만 인원으로 인정 — 전환·할인 등으로 금액이
+//   어중간하면(예: 85,000원) 인원 추정을 하지 않고 1명으로 둔다.
+// ──────────────────────────────────────────────
+var ONE_DAY_PRICE = 35000; // 원데이 1인 단가 (index.html의 ONE_DAY_PRICE와 동일)
+
+function calcOnedayPersons(amount, totalWeeks) {
+  if (Number(totalWeeks) !== 1) return 1;   // 1회짜리 수강권만 해당
+  var n = Number(amount) / ONE_DAY_PRICE;
+  return (n >= 2 && n === Math.floor(n)) ? n : 1;
+}
+
+
+// ──────────────────────────────────────────────
 // 11-A. 원데이 할인 조회 헬퍼
 //   최근 14일 이내 확정된 원데이 결제 기록 반환
 //   1인당 가격(logAmount ÷ 인원)을 반환해 35,000원 하드코딩 방지
@@ -592,11 +607,9 @@ function _findRecentOnedayLog(ss, name, phone) {
       var diffDays = Math.floor((today - classDate) / 86400000);
       if (diffDays > 14) continue;                               // 14일 초과 제외
 
-      var persons = 1;
-      var pm = opt.match(/(\d+)명/);
-      if (pm) persons = parseInt(pm[1]);
       var logAmount = Number(row[5]) || 0;
-      var perPersonPrice = persons > 0 ? Math.round(logAmount / persons) : logAmount;
+      var persons = calcOnedayPersons(logAmount, 1);
+      var perPersonPrice = Math.round(logAmount / persons);
       if (perPersonPrice <= 0) continue;
 
       return {
@@ -623,12 +636,9 @@ function _findOnedayLogByPassKey(ss, passKey) {
     for (var i = 1; i < logData.length; i++) {
       var row = logData[i];
       if (String(row[8] || '') !== passKey) continue;
-      var opt = String(row[3]);
-      var persons = 1;
-      var pm = opt.match(/(\d+)명/);
-      if (pm) persons = parseInt(pm[1]);
       var logAmount = Number(row[5]) || 0;
-      var perPersonPrice = persons > 0 ? Math.round(logAmount / persons) : logAmount;
+      var persons = calcOnedayPersons(logAmount, 1);
+      var perPersonPrice = Math.round(logAmount / persons);
       if (perPersonPrice <= 0) continue;
       return {
         found: true,
@@ -901,8 +911,9 @@ function getAdminDashboardData(weekOffset) {
     var datesJ = getSafeString(dbData[i][9]).split(',').map(function(s){return s.trim();}).filter(String);
     var totalWeeks = Number(dbData[i][5]);
     var type = String(dbData[i][3]);
-    // 원데이는 대표자 1명 이름으로 신청해도 동반 인원이 있을 수 있음(K열, 없으면 1명)
-    var persons = type === '원데이' ? (Number(dbData[i][10]) || 1) : 1;
+    // 1회권은 대표자 1명 이름으로 결제해도 동반 인원이 있을 수 있음(2인이면 70,000원).
+    // 분류가 '원데이'가 아닌 1회권(관리자가 넣은 초대 건 등)도 같은 규칙으로 센다.
+    var persons = calcOnedayPersons(Number(dbData[i][4]), totalWeeks);
     var obj = {
       passKey: dbData[i][0],
       name: dbData[i][1],
