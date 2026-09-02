@@ -742,7 +742,6 @@ function _handleApiGet_(e) {
     if      (fn === 'getInitialData')        { result = getInitialData(); }
     else if (fn === 'verifyCollisionMember') { result = verifyCollisionMember(args[0], args[1]); }
     else if (fn === 'submitApplication')     { result = submitApplication(args[0]); }
-    else if (fn === 'TEMP_debugDashboardCount' && e.parameter.pin === 'a1f9c7-onetime2') { result = TEMP_debugDashboardCount(); }
     else { throw new Error('알 수 없는 함수: ' + fn); }
 
     return ContentService
@@ -3676,14 +3675,3 @@ function auditAndCleanSheets() {
   return summary;
 }
 
-function TEMP_debugDashboardCount() {
-  var data = getAdminDashboardData(0);
-  var target = data.attendees.filter(function(m){ return m.name.indexOf('이준형') !== -1; });
-  return JSON.stringify({
-    nextSaturday: data.nextSaturday,
-    attendeeHeadcount: data.attendeeHeadcount,
-    attendeesCount: data.attendees.length,
-    allPersons: data.attendees.map(function(m){ return m.name+':'+m.persons; }),
-    target: target
-  });
-}
