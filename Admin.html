@@ -724,8 +724,8 @@
     const tok = getStoredToken();
     if (!tok) return;
     google.script.run
-      .withSuccessHandler(function(ok) {
-        if (ok) { sessionAuth=true; initApp(); }
+      .withSuccessHandler(function(result) {
+        if (result && result.token) { persistToken(result.token); sessionAuth=true; initApp(); }
         else { clearStoredToken(); }
       })
       .withFailureHandler(function(){})
@@ -911,7 +911,9 @@
       const attBox = document.getElementById('attendeeList');
       attBox.innerHTML = '';
       const att = adminData.attendees || [];
-      document.getElementById('attCount').innerText = att.length + ' 명';
+      const attHeadcount = (adminData.attendeeHeadcount != null) ? adminData.attendeeHeadcount
+        : att.reduce((sum, m) => sum + (m.persons || 1), 0);
+      document.getElementById('attCount').innerText = attHeadcount + ' 명';
       if (att.length === 0) {
         attBox.innerHTML = isGeneralHol
           ? '<div class="empty-state">휴강일입니다.</div>'
@@ -926,7 +928,7 @@
         if (isLast) chipHtml += `<span class="chip chip-last">마지막</span>`;
         if (isHeld) chipHtml += `<span class="chip chip-held">홀딩</span>`;
         if (m.type === '특정') chipHtml += `<span class="chip chip-vip">VIP</span>`;
-        else if (m.type === '원데이') chipHtml += `<span class="chip chip-oneday">원데이</span>`;
+        else if (m.type === '원데이') chipHtml += `<span class="chip chip-oneday">원데이${m.persons>1?' ×'+m.persons+'명':''}</span>`;
         const canToggle = m.maxPauses > 0 && !isLast && m.type !== '원데이' && !isHeld;
         const toggleHtml = canToggle
           ? `<div class="toggle-wrap" style="background:#E2DFD8;" onclick="togglePauseOptimistic('${pkAttr}',false,this)"><div class="toggle-knob"></div></div>`

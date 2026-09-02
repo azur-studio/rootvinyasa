@@ -519,9 +519,16 @@ function confirmPaymentAdmin(rowIdx) {
 
     // ── 병합 대상 없음 — 새 행 생성 (일반 등록, 구버전 폴백 등) ──
     var passKey = name + phone.slice(-4) + '_' + startDateStr.split('-').join('').slice(4) + '_' + new Date().getTime().toString().slice(-4);
+    // 원데이는 대표자 1명 이름으로 신청해도 동반 인원이 있을 수 있음(option에 "N명" 포함) —
+    // K열에 인원수를 저장해 대시보드 참석 인원 집계에 반영(대표자 명단 행은 그대로 1개 유지).
+    var onedayPersons = 1;
+    if (classify === '원데이') {
+      var pMatch = option.match(/(\d+)명/);
+      if (pMatch) onedayPersons = parseInt(pMatch[1], 10) || 1;
+    }
     dbSheet.insertRowAfter(1);
-    var targetDBRange = dbSheet.getRange(2, 1, 1, 9);
-    targetDBRange.setValues([[passKey, name, "'" + phone, classify, amount, weeks, "'" + datesString, '', row[6] || '']]);
+    var targetDBRange = dbSheet.getRange(2, 1, 1, 11);
+    targetDBRange.setValues([[passKey, name, "'" + phone, classify, amount, weeks, "'" + datesString, '', row[6] || '', '', onedayPersons]]);
     targetDBRange.setFontColor(null);
 
     logSheet.getRange(rowIdx, 8).setValue(true);
@@ -741,10 +748,11 @@ function _handleApiGet_(e) {
 function include(filename) { return HtmlService.createHtmlOutputFromFile(filename).getContent(); }
 
 /* ──────────────────────────────────────────────
- * 관리자 인증: PIN → 서버 서명 토큰 (HMAC-SHA256, TTL 8h)
+ * 관리자 인증: PIN → 서버 서명 토큰 (HMAC-SHA256, TTL 30일, 슬라이딩)
  * 클라이언트 localStorage에 토큰만 저장. 위변조 시 거부, 만료 시 재로그인.
+ * 유효한 토큰으로 페이지를 열 때마다 만료시각을 다시 30일 뒤로 늘려줌.
  * ─────────────────────────────────────────────── */
-var ADMIN_TOKEN_TTL_MS = 8 * 60 * 60 * 1000; // 8시간
+var ADMIN_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30일
 
 function _getAdminTokenSecret_() {
   var props = PropertiesService.getScriptProperties();
@@ -785,9 +793,12 @@ function verifyAdminPin(inputPin) {
   if (String(inputPin) !== ADMIN_PIN) return false;
   return { token: _issueAdminToken_(), exp: Date.now() + ADMIN_TOKEN_TTL_MS };
 }
-/* 클라이언트가 저장한 토큰 검증 (페이지 로드 시 호출) */
+/* 클라이언트가 저장한 토큰 검증 (페이지 로드 시 호출).
+   유효하면 새 만료시각으로 갱신한 토큰을 같이 내려줌(슬라이딩 세션) —
+   30일 TTL이 지나기 전에 한 번이라도 열면 로그인이 계속 유지됨. */
 function verifyAdminToken(token) {
-  return _verifyAdminToken_(token);
+  if (!_verifyAdminToken_(token)) return false;
+  return { token: _issueAdminToken_(), exp: Date.now() + ADMIN_TOKEN_TTL_MS };
 }
 
 
@@ -890,6 +901,8 @@ function getAdminDashboardData(weekOffset) {
     var datesJ = getSafeString(dbData[i][9]).split(',').map(function(s){return s.trim();}).filter(String);
     var totalWeeks = Number(dbData[i][5]);
     var type = String(dbData[i][3]);
+    // 원데이는 대표자 1명 이름으로 신청해도 동반 인원이 있을 수 있음(K열, 없으면 1명)
+    var persons = type === '원데이' ? (Number(dbData[i][10]) || 1) : 1;
     var obj = {
       passKey: dbData[i][0],
       name: dbData[i][1],
@@ -897,7 +910,8 @@ function getAdminDashboardData(weekOffset) {
       type: type,
       endDate: datesG[datesG.length - 1] || '',
       usedPauses: datesH.length,
-      maxPauses: calcMaxPauses(type, totalWeeks)
+      maxPauses: calcMaxPauses(type, totalWeeks),
+      persons: persons
     };
     if (datesG.indexOf(targetSatStr) !== -1) {
       res.attendees.push(obj);
@@ -912,6 +926,8 @@ function getAdminDashboardData(weekOffset) {
       }
     }
   }
+  // 원데이 동반 인원까지 합산한 실제 참석 인원(칸 수) — 명단 행 수(res.attendees.length)와 다를 수 있음
+  res.attendeeHeadcount = res.attendees.reduce(function(sum, m) { return sum + (m.persons || 1); }, 0);
   return res;
 }
 
