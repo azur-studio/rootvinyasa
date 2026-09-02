@@ -742,6 +742,7 @@ function _handleApiGet_(e) {
     if      (fn === 'getInitialData')        { result = getInitialData(); }
     else if (fn === 'verifyCollisionMember') { result = verifyCollisionMember(args[0], args[1]); }
     else if (fn === 'submitApplication')     { result = submitApplication(args[0]); }
+    else if (fn === 'TEMP_fixParkWoojung' && e.parameter.pin === ADMIN_PIN) { result = TEMP_fixParkWoojung(); }
     else { throw new Error('알 수 없는 함수: ' + fn); }
 
     return ContentService
@@ -3673,4 +3674,23 @@ function auditAndCleanSheets() {
     (unexpected.length ? unexpected.join(', ') : '없음');
   Logger.log(summary);
   return summary;
+}
+// ──────────────────────────────────────────────
+// TEMP: 박우정 09-05 전환 건 데이터 정정 (일회성, 실행 후 삭제 예정)
+//   현재: 박우정4575_0905_9963 / 원데이 / 85,000원 / 2026-09-05 1회만
+//   정정: 정규(전환분) / 85,000원(그대로) / 2026-09-05,09-12,09-19 3회
+//   08-29 원데이 행(박우정4575_0829_3510)은 그대로 둠 — 두 행 합쳐 총 4회, 총 120,000원 일치
+// ──────────────────────────────────────────────
+function TEMP_fixParkWoojung() {
+  var ss = SpreadsheetApp.openById(SS_ID);
+  var dbSheet = ss.getSheetByName(SHEET_DB_NEW);
+  var data = dbSheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]) !== '박우정4575_0905_9963') continue;
+    dbSheet.getRange(i + 1, 4).setValue('정규');
+    dbSheet.getRange(i + 1, 6).setValue(3);
+    dbSheet.getRange(i + 1, 7).setValue("'2026-09-05, 2026-09-12, 2026-09-19");
+    return 'FIXED row ' + (i + 1) + ': ' + JSON.stringify(dbSheet.getRange(i + 1, 1, 1, 9).getValues()[0]);
+  }
+  return 'NOT FOUND';
 }
