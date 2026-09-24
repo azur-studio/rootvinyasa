@@ -439,7 +439,7 @@ function confirmPaymentAdmin(rowIdx) {
     var logSheet = ss.getSheetByName(SHEET_LOG);
     var dbSheet  = ss.getSheetByName(SHEET_DB_NEW);
     var row = logSheet.getRange(rowIdx, 1, 1, 17).getValues()[0];
-    if (String(row[7] || '').trim()) return false;
+    if (String(row[8] || '').trim()) return false;
 
     var name = String(row[1]);
     var phone = String(row[2]).replace(REGEX_NON_NUM, '');
@@ -3912,5 +3912,3 @@ function auditAndCleanSheets() {
   Logger.log(summary);
   return summary;
 }
-
-
