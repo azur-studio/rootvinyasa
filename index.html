@@ -3091,7 +3091,7 @@
       option:appData.option, startDate:appData.startDate, endDate:appData.endDate, amount:appData.amount, memo:appData.memo,
       /* 구조화된 전환/분류 필드 — 서버가 option 문자열을 추측하지 않도록 명시적으로 전달.
          '전환'은 화면 표시용 개념일 뿐 실제 분류는 '정규'(원데이 크레딧을 받은 정규 패스)로 저장한다. */
-      passTypeCode: (appData.passType==='전환' ? '정규' : appData.passType),
+      passTypeCode: (appData.option==='원데이 클래스' ? '원데이' : (appData.passType==='전환' ? '정규' : appData.passType)),
       weeksCode: appData.onedayApplied ? appData.originalWeeks : appData.weeksToCalc,
       isConversion: !!appData.onedayApplied,
       onedayCreditPassKey: appData.onedayApplied ? (appData.onedayCreditPassKey || '') : ''
