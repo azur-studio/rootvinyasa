@@ -349,16 +349,9 @@
       justify-content: center;
       z-index: 150;
       pointer-events: none;
-      /* 초기: 데이터 로드 전엔 숨김 — 자연스러운 스크롤 노출 */
-      opacity: 0;
-      transform: translateY(24px);
       transition: opacity 0.55s cubic-bezier(0.16, 1, 0.3, 1), transform 0.55s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .cta-wrap > * { pointer-events: auto; }
-    body.data-loaded .cta-wrap {
-      opacity: 1;
-      transform: none;
-    }
     body.form-active .cta-wrap,
     body.complete-active .cta-wrap {
       opacity: 0;
@@ -608,6 +601,7 @@
     .name-row input::placeholder { color: var(--text-faint); font-weight: 400; }
 
     #searchResultBox { margin-top: 18px; }
+    .name-wait { font-size: 14px; color: var(--text-faint); animation: fadeIn .4s; }
     /* 결과 카드 — 살짝(4px) 떠오르며 등장 */
     #searchResultBox > * {
       animation: subtleRise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -2091,7 +2085,6 @@
      ══════════════════════════════════════════════════════════ */
   var _bookingSheetOpen = false;
   var _sheetHistoryPushed = false;
-  var _dataLoadPoller = null;
 
   function openBookingSheet() {
     if (_bookingSheetOpen) return;
@@ -2101,13 +2094,6 @@
     booking.scrollTop = 0;
     _relayoutSteps();
     if (!_sheetHistoryPushed) { history.pushState({sheet:true},''); _sheetHistoryPushed=true; }
-    if (!dataLoaded) {
-      document.getElementById('slide1Title').innerHTML = '안전하게 정보를<br>불러오는 중입니다.';
-      if (_dataLoadPoller) clearInterval(_dataLoadPoller);
-      _dataLoadPoller = setInterval(function() {
-        if (dataLoaded) { clearInterval(_dataLoadPoller); _dataLoadPoller=null; document.getElementById('slide1Title').innerHTML = '이름'; }
-      }, 120);
-    }
     setTimeout(function() {
       var userNameEl = document.getElementById('userName');
       if (userNameEl && _activeStepId === 'name') userNameEl.focus({ preventScroll: true });
@@ -2260,15 +2246,13 @@
         seatCapacity=Number(data.capacity)||0; bookedSeats=data.bookedSeats||{};
         dataLoaded=true;
         checkReturningUser();
-        /* 데이터 로드 완료 — CTA 등장, 폴러가 살아있으면 정리 */
-        document.body.classList.add('data-loaded');
-        if (_dataLoadPoller) { clearInterval(_dataLoadPoller); _dataLoadPoller=null; }
-        var t = document.getElementById('slide1Title');
-        if (t) t.innerHTML = '이름';
+        /* 이름을 먼저 적고 기다리던 중이면 — 바로 결과를 띄운다 */
+        clearTimeout(_nameWaitTimer);
+        var nameEl = document.getElementById('userName');
+        if (_activeStepId === 'name' && document.activeElement !== nameEl && nameEl.value.trim()) showNameResults(nameEl.value.trim());
       })
       .catch(function() {
-        /* 실패해도 CTA 는 보여줘서 재시도 진입로 확보, 5초 후 자동 재시도 */
-        document.body.classList.add('data-loaded');
+        /* 5초 후 자동 재시도 */
         showCustomAlert('데이터를 불러오지 못했습니다.\n잠시 후 자동으로 재시도합니다.');
         setTimeout(_loadInitialData, 5000);
       });
@@ -2287,9 +2271,18 @@
     return !!v && v.length >= 2 && /^[가-힣A-Za-z\s]{2,10}$/.test(v);
   }
 
+  /* 데이터가 아직이면 결과 자리에서 기다린다 — 1.2초 넘게 걸릴 때만 안내 문구를 띄움 */
+  var _nameWaitTimer = null;
   function showNameResults(nameInput) {
     var box=document.getElementById('searchResultBox'); box.innerHTML='';
+    clearTimeout(_nameWaitTimer);
     if (!nameInput||nameInput.length<1) return;
+    if (!dataLoaded) {
+      _nameWaitTimer = setTimeout(function() {
+        if (!dataLoaded) box.innerHTML = '<p class="name-wait">잠시만 기다려 주세요…</p>';
+      }, 1200);
+      return;
+    }
     var matches = dataLoaded ? memberDB.filter(function(m){ return m.name===nameInput; }) : [];
     if (matches.length===0) {
       /* 일치 회원 없음 → 신규. 버튼 없이 바로 전화번호 단계로 (유효한 이름일 때만) */
@@ -3166,7 +3159,6 @@
     document.getElementById('sec-complete').classList.remove('visible');
     document.body.classList.remove('form-active','complete-active');
     closeBookingSheet();
-    document.getElementById('slide1Title').innerHTML = '이름';
     var rbEl = document.getElementById('returnBanner'); if (rbEl) rbEl.classList.remove('visible','hiding');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
