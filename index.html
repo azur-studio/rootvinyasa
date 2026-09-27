@@ -354,42 +354,18 @@
     .cta-wrap > * { pointer-events: auto; }
     body:not(.intro-done) .cta-wrap { opacity: 0; transform: translateY(24px); pointer-events: none; }
 
-    /* ── 인트로: 원이 시계방향으로 그려지고, 이름이 떠오른 뒤 걷힌다 ── */
-    #intro {
-      position: fixed; inset: 0; z-index: 1000;
-      background: var(--bg);
-      display: flex; align-items: center; justify-content: center;
-      transition: opacity 0.9s cubic-bezier(0.65, 0, 0.35, 1), transform 0.9s cubic-bezier(0.65, 0, 0.35, 1);
-    }
-    #intro.leave { opacity: 0; transform: scale(1.04); pointer-events: none; }
-    .intro-mark { position: relative; width: 168px; height: 168px; display: flex; align-items: center; justify-content: center; }
-    .intro-ring { position: absolute; inset: 0; transform: rotate(-90deg); }
-    .intro-ring circle {
-      fill: none; stroke: var(--text); stroke-width: 0.8;
-      stroke-dasharray: 289; stroke-dashoffset: 289;
-      animation: introDraw 1.9s cubic-bezier(0.65, 0, 0.35, 1) 0.25s forwards;
-    }
-    .intro-ring .track { stroke: var(--line); animation: none; stroke-dashoffset: 0; }
-    .intro-name {
-      overflow: hidden;
-      font-family: 'Noto Serif KR', Georgia, serif;
-      font-size: 9.5px; font-weight: 400;
-      letter-spacing: 0.36em; text-indent: 0.36em; text-transform: uppercase;
-      color: var(--text);
-    }
-    .intro-name span { display: block; transform: translateY(110%); animation: introRise 1s cubic-bezier(0.16, 1, 0.3, 1) 1.5s forwards; }
-    .intro-mark.breathe .intro-ring { animation: introBreathe 2.4s ease-in-out infinite; }
-    @keyframes introDraw { to { stroke-dashoffset: 0; } }
-    @keyframes introRise { to { transform: none; } }
-    @keyframes introBreathe { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
+    /* ── 랜딩이 그려지며 완성된다: 원(시계방향) → 점선 원 → 이름 → 부제 → 상단바·Scroll → 신청 버튼 ── */
+    .hero-circle .ring-outer { stroke-dasharray: 1056; stroke-dashoffset: 1056; animation: heroDraw 2s cubic-bezier(0.65, 0, 0.35, 1) 0.2s forwards; }
+    .hero-circle .ring-inner { opacity: 0; transform-origin: 180px 180px; transform: rotate(-40deg); animation: heroInner 1.6s cubic-bezier(0.16, 1, 0.3, 1) 1.1s forwards; }
+    .hero-brand { opacity: 0; transform: translateY(16px); filter: blur(6px); animation: heroIn 1.2s cubic-bezier(0.16, 1, 0.3, 1) 1.3s forwards; }
+    .hero-sub  { opacity: 0; transform: translateY(10px); animation: heroIn 1s cubic-bezier(0.16, 1, 0.3, 1) 1.9s forwards; }
+    .top-bar, .hero-foot { animation: heroFade 1s ease 2.3s backwards; }
+    @keyframes heroDraw  { to { stroke-dashoffset: 0; } }
+    @keyframes heroInner { to { opacity: 0.5; transform: none; } }
+    @keyframes heroIn    { to { opacity: 1; transform: none; filter: none; } }
+    @keyframes heroFade  { from { opacity: 0; } }
     @media (prefers-reduced-motion: reduce) {
-      .intro-ring circle, .intro-name span { animation-duration: 0.01s; animation-delay: 0s; }
-    }
-    body.form-active .cta-wrap,
-    body.complete-active .cta-wrap {
-      opacity: 0;
-      pointer-events: none;
-      transform: translateY(20px);
+      .hero-circle circle, .hero-brand, .hero-sub, .top-bar, .hero-foot { animation-duration: 0.01s; animation-delay: 0s; }
     }
 
     .floating-cta {
@@ -1540,12 +1516,6 @@
 </head>
 <body>
 
-<div id="intro" aria-hidden="true">
-  <div class="intro-mark" id="introMark">
-    <svg class="intro-ring" viewBox="0 0 100 100"><circle class="track" cx="50" cy="50" r="46"/><circle cx="50" cy="50" r="46"/></svg>
-    <div class="intro-name"><span>Root Vinyasa</span></div>
-  </div>
-</div>
 
 <div id="customAlert" class="custom-toast">
   <div id="customAlertMsg" class="custom-toast-msg"></div>
@@ -1579,8 +1549,8 @@
 <div id="landing-stage">
 <section id="sec-hero">
   <svg class="hero-circle" viewBox="0 0 360 360" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="180" cy="180" r="168" stroke="var(--text-faint)" stroke-width="0.6"/>
-    <circle cx="180" cy="180" r="120" stroke="var(--text-faint)" stroke-width="0.5" stroke-dasharray="1 6" opacity="0.5"/>
+    <circle class="ring-outer" transform="rotate(-90 180 180)" cx="180" cy="180" r="168" stroke="var(--text-faint)" stroke-width="0.6"/>
+    <circle class="ring-inner" cx="180" cy="180" r="120" stroke="var(--text-faint)" stroke-width="0.5" stroke-dasharray="1 6" opacity="0.5"/>
   </svg>
   <div class="hero-text">
     <div class="hero-default">
@@ -2297,21 +2267,17 @@
         setTimeout(_loadInitialData, 5000);
       });
   }
-  /* 인트로 — 연출(2.6초)이 끝나고 데이터가 오면 걷힌다. 데이터가 늦어도 4.5초엔 걷고, 이름 단계에서 마저 기다린다 */
-  function _runIntro() {
-    var intro = document.getElementById('intro');
+  /* 랜딩 연출(2.8초)이 끝나면 신청 버튼 등장 — 데이터가 늦으면 4.5초까지 기다리고, 이후는 이름 단계에서 마저 기다린다 */
+  function _revealCta() {
     var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    var start = Date.now(), minMs = reduced ? 300 : 2600, maxMs = 4500;
-    setTimeout(function() { document.getElementById('introMark').classList.add('breathe'); }, 2200);
+    var start = Date.now(), minMs = reduced ? 0 : 2800, maxMs = 4500;
     (function tick() {
       var t = Date.now() - start;
       if (t < minMs || (!dataLoaded && t < maxMs)) { setTimeout(tick, 100); return; }
-      intro.classList.add('leave');
-      setTimeout(function() { document.body.classList.add('intro-done'); }, 450);
-      setTimeout(function() { intro.remove(); }, 1000);
+      document.body.classList.add('intro-done');
     })();
   }
-  window.onload = function() { _loadInitialData(); _runIntro(); };
+  window.onload = function() { _loadInitialData(); _revealCta(); };
 
   window.addEventListener('beforeunload', function(e) {
     if (!isFinalSubmitted && _bookingSheetOpen && _activeStepId !== 'name') { e.preventDefault(); e.returnValue=''; }
