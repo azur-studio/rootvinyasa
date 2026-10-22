@@ -2406,6 +2406,7 @@
 
   function setUserAuthByIndex(idx) {
     var m = memberDB[idx];
+    if (window._returnMemberIdx >= 0 && idx !== window._returnMemberIdx) dismissReturnHero(); /* 다른 사람으로 바꿈 */
     /* 같은 회원을 다시 고른 경우엔 cascading 리셋 없이 패스 단계로만 이동 */
     var memberChanged = (appData.name !== m.name) || (appData.phoneMask !== m.phoneMask);
     appData.occupiedDates = m.occupiedDates || [];
@@ -2456,6 +2457,7 @@
     if (!rawName) { showCustomAlert('이름을 적어주세요.'); document.getElementById('userName').focus({ preventScroll: true }); return; }
     if (rawName.length<2) { showCustomAlert('이름은 두 글자 이상으로 적어주세요.'); document.getElementById('userName').focus({ preventScroll: true }); return; }
     if (!/^[가-힣A-Za-z\s]{2,10}$/.test(rawName)) { showCustomAlert('이름은 한글 또는 영문으로 부탁드려요.'); document.getElementById('userName').focus({ preventScroll: true }); return; }
+    if (window._returnMemberIdx >= 0) dismissReturnHero(); /* 재방문자가 새 사람으로 바꿈 */
     /* 이름이 *바뀐* 경우엔 이후 단계 데이터(연락처·옵션·날짜·메모) cascading 리셋 */
     var nameChanged = (appData.name !== rawName) || !appData.isNew;
     appData.name=rawName;
