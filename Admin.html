@@ -944,11 +944,13 @@
           : '<div class="empty-state">참석자가 없습니다.</div>';
       }
       att.forEach(m => {
-        const isLast = (m.endDate === adminData.nextSaturday);
+        const isExternal = m.source === '스쿨링크';
+        const isLast = !isExternal && (m.endDate === adminData.nextSaturday);
         const isHeld = !!(adminData.held || []).find(h => h.passKey === m.passKey);
         var pkAttr = escapeJsAttr(m.passKey), pkSafe = escapeHtml(m.passKey);
         var nameAttr = escapeJsAttr(m.name), phoneAttr = escapeJsAttr(m.phone);
         let chipHtml = '';
+        if (isExternal) chipHtml += `<span class="chip chip-oneday">스쿨링크</span>`;
         if (isLast) chipHtml += `<span class="chip chip-last">마지막</span>`;
         if (isHeld) chipHtml += `<span class="chip chip-held">홀딩</span>`;
         if (m.type === '특정') chipHtml += `<span class="chip chip-vip">VIP</span>`;
@@ -959,12 +961,12 @@
         const canToggle = m.maxPauses > 0 && !isLast && m.type !== '원데이' && !isHeld;
         const toggleHtml = canToggle
           ? `<div class="toggle-wrap" style="background:#E2DFD8;" onclick="togglePauseOptimistic('${pkAttr}',false,this)"><div class="toggle-knob"></div></div>`
-          : (isHeld ? '' : `<span style="font-size:12px; color:var(--text-5); font-weight:500;">${m.type==='원데이'?'원데이':'고정'}</span>`);
+          : (isHeld ? '' : `<span style="font-size:12px; color:var(--text-5); font-weight:500;">${isExternal?'예약 확정':(m.type==='원데이'?'원데이':'고정')}</span>`);
         attBox.innerHTML += `
           <div class="roster-item" id="item_${pkSafe}">
-            <div class="r-main" onclick="openMemberDetailFromDash('${nameAttr}','${phoneAttr}')">
+            <div class="r-main" ${isExternal ? '' : `onclick="openMemberDetailFromDash('${nameAttr}','${phoneAttr}')"`}>
               <div class="r-name">${escapeHtml(m.name)} ${chipHtml}</div>
-              <div class="r-exp">만료: ${escapeHtml(safeFormatDate(m.endDate))}</div>
+              <div class="r-exp">${isExternal ? '수업' : '만료'}: ${escapeHtml(safeFormatDate(m.endDate))}</div>
             </div>
             ${toggleHtml}
           </div>`;

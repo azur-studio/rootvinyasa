@@ -663,7 +663,7 @@ function _checkSyncSecret_(key) {
   return !!real && String(key || '') === real;
 }
 
-/* 스쿨링크 예약 확정 → 로그에 이름 추가 (미확정 상태로 남겨 DB 이관 없이 집계만 됨) */
+/* 스쿨링크 예약 확정 → 로그에 보관하고 참석 명단에 직접 반영 (루트빈야사 결제·DB 이관 제외) */
 function addSkoolinkBooking(dateStr, name, seats, secretKey) {
   if (!_checkSyncSecret_(secretKey)) return { ok: false, error: '인증 실패' };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dateStr || ''))) return { ok: false, error: '날짜 형식 오류' };
@@ -1062,6 +1062,7 @@ function getPendingPayments() {
 
   for (var i = 1; i < data.length; i++) {
     if (data[i][7] === true || !data[i][1]) continue;  // 확정됐거나 빈 행 제외
+    if (String(data[i][17] || '') === '스쿨링크') continue;  // 외부 확정 예약은 결제 대기 대상 아님
 
     var option   = String(data[i][3]);
     var schedule = String(data[i][4]);
@@ -1171,6 +1172,28 @@ function getAdminDashboardData(weekOffset) {
         res.potentialAttendees.push(obj);
       }
     }
+  }
+  // 스쿨링크 확정 예약은 별도 패스 발급 없이 로그에서 참석 명단에 직접 반영한다.
+  // 기존에 결제 대기로 보이던 예약도 같은 출처 기준으로 즉시 포함된다.
+  var syncLogSheet = ss.getSheetByName(SHEET_LOG);
+  var syncRows = syncLogSheet ? syncLogSheet.getDataRange().getValues() : [];
+  for (var j = 1; j < syncRows.length; j++) {
+    var syncRow = syncRows[j];
+    if (String(syncRow[17] || '') !== '스쿨링크' || !syncRow[1]) continue;
+    if (syncRow[7] === true) continue; // 이미 수동 확정해 DB에 옮긴 건 중복 표시하지 않음
+    var syncDate = formatDateSafe(String(syncRow[4] || '').split('~')[0].trim());
+    if (syncDate !== targetSatStr) continue;
+    res.attendees.push({
+      passKey: String(syncRow[18] || ''),
+      name: String(syncRow[1]),
+      phone: '',
+      type: '스쿨링크',
+      source: '스쿨링크',
+      endDate: syncDate,
+      usedPauses: 0,
+      maxPauses: 0,
+      persons: seatsOfApplication(String(syncRow[3]), Number(syncRow[5]))
+    });
   }
   // 원데이 동반 인원까지 합산한 실제 참석 인원(칸 수) — 명단 행 수(res.attendees.length)와 다를 수 있음
   res.attendeeHeadcount = res.attendees.reduce(function(sum, m) { return sum + (m.persons || 1); }, 0);

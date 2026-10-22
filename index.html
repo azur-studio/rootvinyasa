@@ -352,7 +352,7 @@
       transition: opacity 0.55s cubic-bezier(0.16, 1, 0.3, 1), transform 0.55s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .cta-wrap > * { pointer-events: auto; }
-    body:not(.intro-done) .cta-wrap { opacity: 0; transform: translateY(24px); pointer-events: none; }
+    body:not(.intro-done) .cta-wrap, body:not(.intro-done) .cta-wrap > * { opacity: 0; transform: translateY(24px); pointer-events: none; }
 
     /* ── 랜딩이 그려지며 완성된다: 원(시계방향) → 점선 원 → 이름 → 부제 → 상단바·Scroll → 신청 버튼 ── */
     .hero-circle .ring-outer { stroke-dasharray: 1056; stroke-dashoffset: 1056; animation: heroDraw 2s cubic-bezier(0.65, 0, 0.35, 1) 0.2s forwards; }
@@ -366,6 +366,12 @@
     @keyframes heroFade  { from { opacity: 0; } }
     @media (prefers-reduced-motion: reduce) {
       .hero-circle circle, .hero-brand, .hero-sub, .top-bar, .hero-foot { animation-duration: 0.01s; animation-delay: 0s; }
+    }
+    body.form-active .cta-wrap, body.form-active .cta-wrap > *,
+    body.complete-active .cta-wrap, body.complete-active .cta-wrap > * {
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(20px);
     }
 
     .floating-cta {
